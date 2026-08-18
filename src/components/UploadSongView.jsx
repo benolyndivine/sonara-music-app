@@ -70,7 +70,7 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
 
   const applySongFile = (file) => {
     if (!file) return;
-    if (!file.type.startsWith('audio/')) {
+    if (!file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|aac|m4a|ogg|flac)$/i)) {
       setFieldErrors((prev) => ({ ...prev, song: "File must be an audio track (MP3, WAV)." }));
       return;
     }
@@ -136,6 +136,7 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
     setStatus({ type: 'loading', message: 'Uploading audio & artwork to Cloudinary…' });
 
     try {
+      // 1. Upload assets in parallel
       const [coverUrl, songUrl] = await Promise.all([
         uploadToCloudinary(coverFile, 'image'),
         uploadToCloudinary(songFile, 'video'),
@@ -144,13 +145,20 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
       setStep('metadata');
       setStatus({ type: 'loading', message: 'Saving track metadata to Firebase…' });
 
+      // 2. Comprehensive schema to support every view in Sonara
       const songData = {
         title: title.trim(),
+        name: title.trim(),
         artist: artist.trim(),
         cover: coverUrl,
+        coverUrl: coverUrl,
+        image: coverUrl,
+        imageUrl: coverUrl,
         songUrl: songUrl,
+        audioUrl: songUrl,
         uploadedBy: user?.email || 'admin',
         createdAt: serverTimestamp(),
+        uploadedAt: new Date().toISOString(),
       };
 
       const docRef = await addDoc(collection(db, targetCollection), songData);
@@ -173,7 +181,7 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
     } catch (err) {
       console.error('Upload Error:', err);
       setStep(null);
-      setStatus({ type: 'error', message: err.message || 'Failed to upload song. Please try again.' });
+      setStatus({ type: 'error', message: err.message || 'Failed to upload song. Please check your network and upload presets.' });
     } finally {
       setLoading(false);
     }

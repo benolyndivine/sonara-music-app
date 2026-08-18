@@ -1,24 +1,31 @@
-const CLOUD_NAME = "dkr8ts3sy"; 
-const UPLOAD_PRESET = "music_app_preset";
+// Replace with your actual Cloudinary Cloud Name and unsigned Upload Preset
+const CLOUD_NAME = 'YOUR_CLOUDINARY_CLOUD_NAME';
+const UPLOAD_PRESET = 'YOUR_UNSIGNED_UPLOAD_PRESET';
 
-export async function uploadToCloudinary(file, resourceType = "auto") {
+export async function uploadToCloudinary(file, resourceType = 'auto') {
+  if (!file) throw new Error('No file provided for upload.');
+
+  // For audio files, Cloudinary requires 'video' or 'auto'
+  const endpointType = file.type.startsWith('audio/') ? 'video' : resourceType;
+
   const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", UPLOAD_PRESET);
+  formData.append('file', file);
+  formData.append('upload_preset', UPLOAD_PRESET);
 
-  const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/upload`,
-    {
-      method: "POST",
-      body: formData,
-    }
-  );
+  const endpoint = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${endpointType}/upload`;
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error?.message || "Cloudinary upload failed");
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(
+      errorJson.error?.message || `Cloudinary upload failed with HTTP status ${res.status}`
+    );
   }
 
-  const data = await response.json();
-  return data.secure_url;
+  const data = await res.json();
+  return data.secure_url || data.url;
 }
