@@ -4,7 +4,8 @@ import { getSavedArtists } from '../utils/savedArtists';
 const ADMIN_EMAILS = [
   'benolynd@gmail.com',
   'darkrush311@gmail.com',
-  '2007kirubhasaravanan@gmail.com'
+  '2007kirubhasaravanan@gmail.com',
+  'ganeshjagan003@gmail.com'
 ];
 
 export default function ProfileDrawerView({

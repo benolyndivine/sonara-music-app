@@ -664,7 +664,8 @@ export default function App() {
           'jebarejila2@gmail.com',
           'benolynd@gmail.com',
           'darkrush311@gmail.com',
-          '2007kirubhasaravanan@gmail.com'
+          '2007kirubhasaravanan@gmail.com',
+          'ganeshjagan003@gmail.com'
         ];
 
         if (adminEmails.includes(user.email)) {

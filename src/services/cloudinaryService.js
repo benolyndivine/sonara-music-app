@@ -1,6 +1,6 @@
 // Replace with your actual Cloudinary Cloud Name and unsigned Upload Preset
-const CLOUD_NAME = 'YOUR_CLOUDINARY_CLOUD_NAME';
-const UPLOAD_PRESET = 'YOUR_UNSIGNED_UPLOAD_PRESET';
+const CLOUD_NAME = 'dkr8ts3sy';
+const UPLOAD_PRESET = 'music_app_preset';
 
 export async function uploadToCloudinary(file, resourceType = 'auto') {
   if (!file) throw new Error('No file provided for upload.');
