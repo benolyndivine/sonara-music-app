@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { getSavedArtists } from '../utils/savedArtists';
 
-const HEAD_ADMIN_EMAIL = 'benolynd@gmail.com';
+const ADMIN_EMAILS = [
+  'benolynd@gmail.com',
+  'darkrush311@gmail.com',
+  '2007kirubhasaravanan@gmail.com'
+];
 
 export default function ProfileDrawerView({
   user,
@@ -33,7 +37,7 @@ export default function ProfileDrawerView({
 
   if (!user) return null;
 
-  const isHeadAdmin = user.email === HEAD_ADMIN_EMAIL;
+  const isHeadAdmin = ADMIN_EMAILS.includes(user.email);
   const savedArtistsCount = getSavedArtists(artists).length;
 
   const handleCheckUpdate = () => {

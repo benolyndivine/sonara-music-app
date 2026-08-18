@@ -7,11 +7,29 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
   const [downloadedMap, setDownloadedMap] = useState({});
   const searchInputRef = useRef(null);
 
-  // 🆕 Auto-focus the search field the moment this view mounts (i.e. the
-  // instant the user taps the search icon), so the mobile keyboard pops up
-  // immediately without an extra tap on the input itself.
+  // 🚀 Multi-stage mobile WebView auto-focus handler
   useEffect(() => {
-    searchInputRef.current?.focus();
+    const triggerFocus = () => {
+      if (searchInputRef.current) {
+        searchInputRef.current.focus({ preventScroll: false });
+      }
+    };
+
+    // Immediate attempt
+    triggerFocus();
+
+    // Frame-synced attempt
+    const frameId = requestAnimationFrame(triggerFocus);
+
+    // Timeout fallbacks to catch WebView animation and touch release cycles
+    const timer1 = setTimeout(triggerFocus, 80);
+    const timer2 = setTimeout(triggerFocus, 250);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
   }, []);
 
   useEffect(() => {
@@ -202,7 +220,6 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
                         <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Song'}</span>
                       </button>
 
-                      {/* 🛠️ NEW: HIGH CONTRAST NATIVE SHARE BUTTON */}
                       <button 
                         onClick={(e) => handleShareSong(e, song)} 
                         className="dropdown-playlist-option" 

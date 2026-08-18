@@ -43,7 +43,6 @@ export default function App() {
   const [lyrics, setLyrics] = useState([]);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   const [albums, setAlbums] = useState([]);
   const [selectedAlbum, setSelectedAlbum] = useState(null); 
@@ -325,7 +324,6 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser ?? null);
-      if (!currentUser) setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -655,14 +653,21 @@ export default function App() {
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    setLoading(true);
 
     const fetchAllData = async () => {
       try {
         const songsSnap = await getDocs(collection(db, 'songs'));
         let songsList = songsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        if (user.email === 'bright2013.br@gmail.com' || user.email === 'jebarejila2@gmail.com' || user.email === 'benolynd@gmail.com') {
+        const adminEmails = [
+          'bright2013.br@gmail.com',
+          'jebarejila2@gmail.com',
+          'benolynd@gmail.com',
+          'darkrush311@gmail.com',
+          '2007kirubhasaravanan@gmail.com'
+        ];
+
+        if (adminEmails.includes(user.email)) {
           try {
             const christianSongsSnap = await getDocs(collection(db, 'christianSongs'));
             const christianSongsList = christianSongsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -715,8 +720,6 @@ export default function App() {
 
       } catch (err) {
         console.error('Data waterfall sync exception logged:', err);
-      } finally {
-        setLoading(false); 
       }
     };
 
@@ -724,7 +727,7 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || loading) return;
+    if (!user) return;
 
     const playlistsQuery = query(collection(db, 'playlists'), where('uid', '==', user.uid));
 
@@ -749,7 +752,7 @@ export default function App() {
     });
 
     return () => { unsubPlaylists(); unsubPlaylistSongs(); unsubAlbums(); unsubArtists(); unsubLyrics(); };
-  }, [user, loading]);
+  }, [user]);
 
   // ─────────────────────────────────────────────────────────────
   // 🎵 AUDIO ATTRIBUTES TRACK OVERLAY MOUNT CHANNEL
@@ -1015,7 +1018,6 @@ export default function App() {
   // 🔑 AUTH
   // ─────────────────────────────────────────────────────────────
   const handleLogin = async () => {
-    setLoading(true);
     try {
       if (Capacitor.isNativePlatform()) {
         const result = await FirebaseAuthentication.signInWithGoogle();
@@ -1028,8 +1030,6 @@ export default function App() {
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -1134,17 +1134,6 @@ export default function App() {
     await auth.currentUser.reload();
     setUser({ ...auth.currentUser });
   };
-
-  if (loading) {
-    return (
-      <div className="loading-screen-wrapper">
-        <div className="loading-container">
-          <img src={logo} className="loading-logo" alt="Loading..." />
-          <div className="loading-pulse-ring"></div>
-        </div>
-      </div>
-    );
-  }
 
   if (!user) {
     return (
