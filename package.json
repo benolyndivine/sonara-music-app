@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@anuradev/capacitor-background-mode": "^7.2.1",
+    "@awesome-cordova-plugins/core": "^9.5.0",
     "@awesome-cordova-plugins/media": "^9.2.0",
     "@capacitor-community/media": "^9.1.0",
     "@capacitor-community/native-audio": "^8.0.0",
@@ -21,12 +22,14 @@
     "@capacitor/core": "^8.4.1",
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/share": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.3",
     "@capgo/capacitor-media-session": "^8.0.28",
     "@capgo/capacitor-native-audio": "^8.4.14",
     "cordova-plugin-media": "^7.0.0",
     "firebase": "^12.15.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",

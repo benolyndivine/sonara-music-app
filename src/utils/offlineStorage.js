@@ -3,12 +3,39 @@ import { Capacitor } from '@capacitor/core';
 import { getDownloadQuality, getStreamingQuality, appendQualityParam } from './audioQuality';
 
 /**
+ * Checks and requests runtime storage/audio permissions on native devices
+ */
+export async function requestStoragePermission() {
+  if (!Capacitor.isNativePlatform()) return true;
+
+  try {
+    const status = await Filesystem.checkPermissions();
+    if (status.publicStorage === 'granted') {
+      return true;
+    }
+    const request = await Filesystem.requestPermissions();
+    return request.publicStorage === 'granted';
+  } catch (err) {
+    console.warn('Storage permission request encountered an issue:', err);
+    return true; // Fallback gracefully if permission check is handled by OS
+  }
+}
+
+/**
  * Downloads a remote track file source stream to localized app directories on hybrid hardware
  */
 export async function downloadTrackToDevice(song) {
   const rawAudioUrl = song.songUrl || song.audioUrl;
   const songTitle = song.title || song.name;
   if (!rawAudioUrl) throw new Error("No target streaming audio URL source registered for this track record.");
+
+  // Request runtime permission before writing to device storage
+  if (Capacitor.isNativePlatform()) {
+    const hasPermission = await requestStoragePermission();
+    if (!hasPermission) {
+      throw new Error("Storage permission was denied by user.");
+    }
+  }
 
   // 🆕 Request the tier picked in Settings → Download Quality. Backends that
   // support per-request transcoding profiles honor `quality` immediately;

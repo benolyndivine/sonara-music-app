@@ -70,7 +70,9 @@ export default function SettingsView({
   };
 
   return (
-    <div className="mobile-content" style={{ paddingBottom: '40px' }}>
+    <div className="mobile-content set-hide-scrollbar" style={{ paddingBottom: '40px', overflowY: 'auto' }}>
+      <style>{settingsScrollbarStyles}</style>
+
       {/* View Title Navigation Header Bar */}
       <div className="view-header" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
         <button className="back-arrow-btn" onClick={onBack} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}>
@@ -102,11 +104,7 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* 🆕 SECTION: STREAMING QUALITY — tier requested from the CDN while
-          playing a track live over the network. Applied in
-          utils/offlineStorage.js (getPlaybackSource) via a `quality` query
-          param, so it takes effect on both native and web playback, and on
-          next-track prefetching in App.jsx. */}
+      {/* 🆕 SECTION: STREAMING QUALITY */}
       <section style={{ marginBottom: '28px', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
         <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#ffffff', fontWeight: '700' }}>Streaming Quality</h3>
         <p style={{ margin: '0 0 14px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Higher quality sounds better but uses more data.</p>
@@ -129,10 +127,7 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* 🆕 SECTION: DOWNLOAD QUALITY — tier requested when saving a track
-          for offline playback. Applied in utils/offlineStorage.js
-          (downloadTrackToDevice) and stored with the track's offline
-          metadata so the Downloaded tab always knows what's on disk. */}
+      {/* 🆕 SECTION: DOWNLOAD QUALITY */}
       <section style={{ marginBottom: '28px', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
         <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#ffffff', fontWeight: '700' }}>Download Quality</h3>
         <p style={{ margin: '0 0 14px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Higher quality downloads take up more storage space.</p>
@@ -155,9 +150,7 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* 🆕 SECTION: ACCENT COLOR — appTheme was previously passed into this
-          component but never rendered anywhere, so changing it had zero
-          effect. It now live-updates the app's --accent CSS variable. */}
+      {/* 🆕 SECTION: ACCENT COLOR */}
       <section style={{ marginBottom: '28px', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
         <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#ffffff', fontWeight: '700' }}>Accent Color</h3>
         <p style={{ margin: '0 0 14px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Choose the highlight color used across Sonara.</p>
@@ -188,9 +181,7 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* 🆕 SECTION: LYRICS TEXT SIZE — same story as Accent Color, this was
-          plumbed through as a prop with no control anywhere. Now drives the
-          font size of the full lyrics sheet in FullPlayerView. */}
+      {/* 🆕 SECTION: LYRICS TEXT SIZE */}
       <section style={{ marginBottom: '28px', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
         <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#ffffff', fontWeight: '700' }}>Lyrics Text Size</h3>
         <p style={{ margin: '0 0 14px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Adjust readability in the full lyrics view.</p>
@@ -212,6 +203,7 @@ export default function SettingsView({
           ))}
         </div>
       </section>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
         {/* Toggle Option Row Template */}
@@ -257,3 +249,15 @@ export default function SettingsView({
     </div>
   );
 }
+
+const settingsScrollbarStyles = `
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .set-hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .set-hide-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+`;

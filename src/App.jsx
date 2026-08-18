@@ -3,12 +3,14 @@ import { collection, doc, addDoc, deleteDoc, query, where, onSnapshot, getDocs, 
 import { GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app'; 
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { Filesystem } from '@capacitor/filesystem';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { MediaSession } from '@capgo/capacitor-media-session';
 import { BackgroundMode } from '@anuradev/capacitor-background-mode';
 import { Media } from '@awesome-cordova-plugins/media';
 import { db, auth, provider } from './firebase';
-import { getPlaybackSource, isTrackCachedOffline } from './utils/offlineStorage';
+import { getPlaybackSource, isTrackCachedOffline, downloadTrackToDevice } from './utils/offlineStorage';
 import { getStreamingQuality, appendQualityParam } from './utils/audioQuality';
 import { songMatchesArtist, splitArtistCredits } from './utils/artistMatch';
 import Header from './components/Header';
@@ -25,6 +27,10 @@ import ProfileDrawerView from './components/ProfileDrawerView';
 import SettingsView from './components/SettingsView';
 import AlbumDetailsView from './components/AlbumDetailsView'; 
 import ArtistDetailsView from './components/ArtistDetailsView';
+import UploadSongView from './components/UploadSongView';
+import ManageAlbumsView from './components/ManageAlbumsView';
+import ManageArtistsView from './components/ManageArtistsView';
+import ManageLyricsView from './components/ManageLyricsView';
 import logo from './assets/logo3.png';
 import './App.css';
 
@@ -56,6 +62,11 @@ export default function App() {
   const wasOnlineRef = useRef(navigator.onLine);
   const [showFullPlayer, setShowFullPlayer] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showUploadSong, setShowUploadSong] = useState(false);
+  const [showManageAlbums, setShowManageAlbums] = useState(false);
+  const [showManageArtists, setShowManageArtists] = useState(false);
+  const [showManageLyrics, setShowManageLyrics] = useState(false);
 
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
@@ -85,31 +96,72 @@ export default function App() {
   const TRANSPORT_PAUSE_GRACE_MS = 700;
 
   // ─────────────────────────────────────────────────────────────
-  // 🕘 NAVIGATION HISTORY STACK — records every screen-level state change
-  // (bottom-tab view, album/artist detail, full player, profile drawer) in
-  // the exact order the user visited them, no matter which control
-  // triggered the change (bottom nav, header search icon, "See all",
-  // tapping an album/artist from Home/Search/Library, opening the profile
-  // drawer, expanding the player, etc). The Android hardware back button
-  // below pops this stack one step at a time, so back always retraces the
-  // user's actual navigation sequence instead of jumping to a fixed screen.
+  // 📱 FULL-SCREEN STATUS BAR OVERLAY & COLOR HARMONIZATION
+  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const configureStatusBar = async () => {
+      try {
+        await StatusBar.setOverlaysWebView({ overlay: true });
+        await StatusBar.setStyle({ style: Style.Dark });
+        await StatusBar.setBackgroundColor({ color: '#060c18' });
+      } catch (err) {
+        console.warn('Status bar overlay configuration failed:', err);
+      }
+    };
+
+    configureStatusBar();
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────
+  // 💾 STORAGE PERMISSION HANDLER
+  // ─────────────────────────────────────────────────────────────
+  const ensureStoragePermission = async () => {
+    if (!Capacitor.isNativePlatform()) return true;
+    try {
+      const status = await Filesystem.checkPermissions();
+      if (status.publicStorage === 'granted') return true;
+      const requested = await Filesystem.requestPermissions();
+      return requested.publicStorage === 'granted';
+    } catch (err) {
+      console.warn('Storage permission request failed:', err);
+      return true;
+    }
+  };
+
+  const handleDownloadSong = async (song) => {
+    const hasPermission = await ensureStoragePermission();
+    if (!hasPermission) {
+      alert("Storage permission is required to save songs offline.");
+      return;
+    }
+    try {
+      await downloadTrackToDevice(song);
+      alert(`"${song.title || song.name}" downloaded for offline playback!`);
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('Failed to download track.');
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // 🕘 NAVIGATION HISTORY STACK (Tracks primary root & sub-pages)
   // ─────────────────────────────────────────────────────────────
   const screenSnapshotRef = useRef({
-    currentView, selectedAlbum, selectedArtist, showFullPlayer, showProfile, libraryActiveTab, selectedPlaylist,
+    currentView, selectedAlbum, selectedArtist, libraryActiveTab, selectedPlaylist
   });
   const navHistoryRef = useRef([]); // stack of previous snapshots, oldest first
   const isBackNavigationRef = useRef(false); // true while applying a popped snapshot, so it isn't re-pushed
 
   useEffect(() => {
-    const nextSnapshot = { currentView, selectedAlbum, selectedArtist, showFullPlayer, showProfile, libraryActiveTab, selectedPlaylist };
+    const nextSnapshot = { currentView, selectedAlbum, selectedArtist, libraryActiveTab, selectedPlaylist };
     const prevSnapshot = screenSnapshotRef.current;
 
     const didChange =
       prevSnapshot.currentView !== nextSnapshot.currentView ||
       prevSnapshot.selectedAlbum !== nextSnapshot.selectedAlbum ||
       prevSnapshot.selectedArtist !== nextSnapshot.selectedArtist ||
-      prevSnapshot.showFullPlayer !== nextSnapshot.showFullPlayer ||
-      prevSnapshot.showProfile !== nextSnapshot.showProfile ||
       prevSnapshot.libraryActiveTab !== nextSnapshot.libraryActiveTab ||
       // Compare by id, not object reference: renaming the open playlist
       // (handleInlineRenameSave) rebuilds the selectedPlaylist object with
@@ -132,29 +184,81 @@ export default function App() {
     // step would push this stale snapshot, and popping back into it later
     // would briefly show the pre-rename playlist name.
     screenSnapshotRef.current = nextSnapshot;
-  }, [currentView, selectedAlbum, selectedArtist, showFullPlayer, showProfile, libraryActiveTab, selectedPlaylist]);
+  }, [currentView, selectedAlbum, selectedArtist, libraryActiveTab, selectedPlaylist]);
 
   // ─────────────────────────────────────────────────────────────
-  // 📱 NATIVE MOBILE BACK BUTTON EVENT INTERCEPTOR
+  // 📱 HIERARCHICAL ANDROID HARDWARE BACK BUTTON SEQUENCE
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
     const backButtonListener = CapacitorApp.addListener('backButton', () => {
-      const previous = navHistoryRef.current.pop();
+      // 1. Close full player overlay first
+      if (showFullPlayer) {
+        setShowFullPlayer(false);
+        return;
+      }
 
+      // 2. Close active Settings view and return to Profile Drawer
+      if (showSettings) {
+        setShowSettings(false);
+        return;
+      }
+
+      // 3. Close Admin Studio views and return to Profile Drawer
+      if (showUploadSong) {
+        setShowUploadSong(false);
+        return;
+      }
+      if (showManageAlbums) {
+        setShowManageAlbums(false);
+        return;
+      }
+      if (showManageArtists) {
+        setShowManageArtists(false);
+        return;
+      }
+      if (showManageLyrics) {
+        setShowManageLyrics(false);
+        return;
+      }
+
+      // 4. Close Profile Drawer
+      if (showProfile) {
+        setShowProfile(false);
+        return;
+      }
+
+      // 5. Close playlist detail view inside Library
+      if (selectedPlaylist) {
+        setSelectedPlaylist(null);
+        return;
+      }
+
+      // 6. Close album or artist details view
+      if (selectedAlbum) {
+        setSelectedAlbum(null);
+        return;
+      }
+      if (selectedArtist) {
+        setSelectedArtist(null);
+        return;
+      }
+
+      // 7. Unwind nested history stack (views & tabs)
+      const previous = navHistoryRef.current.pop();
       if (previous) {
         isBackNavigationRef.current = true;
         setCurrentView(previous.currentView);
         setSelectedAlbum(previous.selectedAlbum);
         setSelectedArtist(previous.selectedArtist);
-        setShowFullPlayer(previous.showFullPlayer);
-        setShowProfile(previous.showProfile);
         setLibraryActiveTab(previous.libraryActiveTab);
         setSelectedPlaylist(previous.selectedPlaylist);
+      } else if (currentView !== 'home') {
+        // Fallback: If not on Home tab, return to Home
+        setCurrentView('home');
       } else {
-        // Nothing earlier in the sequence — this is the first screen the
-        // user landed on this session, so back does what Android expects.
+        // At root Home: minimize the application
         CapacitorApp.minimizeApp();
       }
     });
@@ -162,7 +266,19 @@ export default function App() {
     return () => {
       backButtonListener.then((listener) => listener.remove());
     };
-  }, []);
+  }, [
+    showFullPlayer,
+    showSettings,
+    showUploadSong,
+    showManageAlbums,
+    showManageArtists,
+    showManageLyrics,
+    showProfile,
+    selectedPlaylist,
+    selectedAlbum,
+    selectedArtist,
+    currentView
+  ]);
 
   // Mutable mirror of audio-relevant state to survive OS thread freezing and
   // background closure scopes (native playback callbacks read this instead
@@ -546,7 +662,7 @@ export default function App() {
         const songsSnap = await getDocs(collection(db, 'songs'));
         let songsList = songsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        if (user.email === 'bright2013.br@gmail.com' || user.email === 'jebarejila2@gmail.com') {
+        if (user.email === 'bright2013.br@gmail.com' || user.email === 'jebarejila2@gmail.com' || user.email === 'benolynd@gmail.com') {
           try {
             const christianSongsSnap = await getDocs(collection(db, 'christianSongs'));
             const christianSongsList = christianSongsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -620,7 +736,19 @@ export default function App() {
       setPlaylistSongs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    return () => { unsubPlaylists(); unsubPlaylistSongs(); };
+    const unsubAlbums = onSnapshot(collection(db, 'albums'), (snap) => {
+      setAlbums(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const unsubArtists = onSnapshot(collection(db, 'artists'), (snap) => {
+      setArtists(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const unsubLyrics = onSnapshot(collection(db, 'lyrics'), (snap) => {
+      setLyrics(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => { unsubPlaylists(); unsubPlaylistSongs(); unsubAlbums(); unsubArtists(); unsubLyrics(); };
   }, [user, loading]);
 
   // ─────────────────────────────────────────────────────────────
@@ -908,6 +1036,11 @@ export default function App() {
   const handleLogout = async () => {
     setIsPlaying(false);
     setShowProfile(false);
+    setShowSettings(false);
+    setShowUploadSong(false);
+    setShowManageAlbums(false);
+    setShowManageArtists(false);
+    setShowManageLyrics(false);
     if (Capacitor.isNativePlatform()) await FirebaseAuthentication.signOut();
     await signOut(auth);
   };
@@ -1031,9 +1164,7 @@ export default function App() {
       className={`mobile-container ${increaseContrast ? 'high-contrast-mode' : ''} ${!motionEnabled ? 'disable-animations' : ''}`}
       style={{ '--accent': appTheme }}
     >
-      {currentView !== 'settings' && (
-        <Header user={user} onOpenProfile={() => setShowProfile(true)} onViewChange={setCurrentView} />
-      )}
+      <Header user={user} onOpenProfile={() => setShowProfile(true)} onViewChange={setCurrentView} />
 
       {!isOnline && (
         <div style={{
@@ -1214,34 +1345,14 @@ export default function App() {
         />
       )}
 
-      {currentView === 'settings' && (
-        <SettingsView
-          contentRestrictions={contentRestrictions}
-          setContentRestrictions={setContentRestrictions}
-          appTheme={appTheme}
-          setAppTheme={setAppTheme}
-          motionEnabled={motionEnabled}
-          setMotionEnabled={setMotionEnabled}
-          lyricsSize={lyricsSize}
-          setLyricsSize={setLyricsSize}
-          increaseContrast={increaseContrast}
-          setIncreaseContrast={setIncreaseContrast}
-          automaticallySendDiagnostics={automaticallySendDiagnostics}
-          setAutomaticallySendDiagnostics={setAutomaticallySendDiagnostics}
-          onBack={() => setCurrentView('home')}
-        />
-      )}
-
-      {currentView !== 'settings' && (
-        <MiniPlayer
-          currentTrack={currentTrack}
-          isPlaying={isPlaying}
-          onTogglePlay={togglePlayPause}
-          onNext={triggerNextTrackLogic}
-          onPrev={triggerPrevTrackLogic}
-          onExpand={() => setShowFullPlayer(true)}
-        />
-      )}
+      <MiniPlayer
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        onTogglePlay={togglePlayPause}
+        onNext={triggerNextTrackLogic}
+        onPrev={triggerPrevTrackLogic}
+        onExpand={() => setShowFullPlayer(true)}
+      />
 
       {showFullPlayer && (
         <FullPlayerView
@@ -1275,22 +1386,119 @@ export default function App() {
           artists={artists}
           onLogout={handleLogout}
           onNavigateSettings={() => {
-            setCurrentView('settings');
-            setShowProfile(false);
+            setShowSettings(true);
           }}
           onGoToSavedArtists={() => {
             setLibraryActiveTab('artists');
             setCurrentView('library');
             setShowProfile(false);
           }}
+          onOpenUploadSong={() => {
+            setShowUploadSong(true);
+          }}
+          onOpenManageAlbums={() => {
+            setShowManageAlbums(true);
+          }}
+          onOpenManageArtists={() => {
+            setShowManageArtists(true);
+          }}
+          onOpenManageLyrics={() => {
+            setShowManageLyrics(true);
+          }}
           onUpdateProfile={handleUpdateProfile}
           onClose={() => setShowProfile(false)}
         />
       )}
 
-      {currentView !== 'settings' && (
-        <BottomNavigation currentView={currentView} onViewChange={setCurrentView} isOnline={isOnline} />
+      {showSettings && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: '#060c18', zIndex: 650, overflowY: 'auto',
+          boxSizing: 'border-box',
+          animation: 'slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}>
+          <SettingsView
+            contentRestrictions={contentRestrictions}
+            setContentRestrictions={setContentRestrictions}
+            appTheme={appTheme}
+            setAppTheme={setAppTheme}
+            motionEnabled={motionEnabled}
+            setMotionEnabled={setMotionEnabled}
+            lyricsSize={lyricsSize}
+            setLyricsSize={setLyricsSize}
+            increaseContrast={increaseContrast}
+            setIncreaseContrast={setIncreaseContrast}
+            automaticallySendDiagnostics={automaticallySendDiagnostics}
+            setAutomaticallySendDiagnostics={setAutomaticallySendDiagnostics}
+            onBack={() => {
+              setShowSettings(false);
+            }}
+          />
+        </div>
       )}
+
+      {showUploadSong && (
+        <UploadSongView
+          user={user}
+          onBack={() => {
+            setShowUploadSong(false);
+          }}
+          onSongUploaded={(newSong) => {
+            setSongs((prev) => [newSong, ...prev]);
+          }}
+        />
+      )}
+
+      {showManageAlbums && (
+        <ManageAlbumsView
+          albums={albums}
+          songs={songs}
+          onBack={() => {
+            setShowManageAlbums(false);
+          }}
+          onAlbumCreated={(newAlbum) => {
+            setAlbums((prev) => [newAlbum, ...prev]);
+          }}
+          onSongUpdated={(updatedSong) => {
+            setSongs((prev) => prev.map(s => s.id === updatedSong.id ? updatedSong : s));
+          }}
+        />
+      )}
+
+      {showManageArtists && (
+        <ManageArtistsView
+          artists={artists}
+          onBack={() => {
+            setShowManageArtists(false);
+          }}
+          onArtistCreated={(newArtist) => {
+            setArtists((prev) => [newArtist, ...prev]);
+          }}
+        />
+      )}
+
+      {showManageLyrics && (
+        <ManageLyricsView
+          songs={songs}
+          lyrics={lyrics}
+          onBack={() => {
+            setShowManageLyrics(false);
+          }}
+          onLyricsSaved={(savedLyric) => {
+            setLyrics((prev) => {
+              const idx = prev.findIndex(l => l.id === savedLyric.id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = savedLyric;
+                return next;
+              }
+              return [...prev, savedLyric];
+            });
+          }}
+        />
+      )}
+
+      <BottomNavigation currentView={currentView} onViewChange={setCurrentView} isOnline={isOnline} />
     </div>
   );
 }
