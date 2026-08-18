@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "614356545369",
+    "project_id": "sonara-95818",
+    "storage_bucket": "sonara-95818.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:614356545369:android:16a239120c4c8c76dba648",
+        "android_client_info": {
+          "package_name": "com.sonara.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "614356545369-44l7h96p1figs45oejcpuqmnqm9qqt3g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sonara.app",
+            "certificate_hash": "813924b10d0d801dc81042366bf0b4ab54241228"
+          }
+        },
+        {
+          "client_id": "614356545369-8g5gnfa3h45bjbaf40hg10trhfeclqdb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbCp86ZPCY7-KC3aiii-Ym1zABJ_f86pk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "614356545369-8g5gnfa3h45bjbaf40hg10trhfeclqdb.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,17 @@
+{
+  "appId": "com.sonara.app",
+  "appName": "Sonara",
+  "webDir": "dist",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": ["google.com"]
+    },
+    "BackgroundMode": {
+      "title": "Sonara",
+      "text": "Playing music in background",
+      "resume": true,
+      "silent": false
+    }
+  }
+}

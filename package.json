@@ -1,0 +1,39 @@
+{
+  "name": "sonara",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@anuradev/capacitor-background-mode": "^7.2.1",
+    "@awesome-cordova-plugins/media": "^9.2.0",
+    "@capacitor-community/media": "^9.1.0",
+    "@capacitor-community/native-audio": "^8.0.0",
+    "@capacitor-firebase/authentication": "^8.3.0",
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
+    "@capgo/capacitor-media-session": "^8.0.28",
+    "@capgo/capacitor-native-audio": "^8.4.14",
+    "cordova-plugin-media": "^7.0.0",
+    "firebase": "^12.15.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "oxlint": "^1.69.0",
+    "vite": "^8.1.0"
+  }
+}

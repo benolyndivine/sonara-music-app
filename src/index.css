@@ -1,0 +1,122 @@
+/* ==========================================================================
+   1. GLOBAL VARIABLES & BRAND MATRIX
+   ========================================================================== */
+:root {
+  --bg-dark: #05070c;
+  --bg-surface: #121824;
+  --accent: #1db954; /* Premium Brand Theme Green Accent */
+  --text-main: #ffffff;
+  --text-muted: #a7a7a7;
+}
+
+/* ==========================================================================
+   2. RESET & BASE APP TIMING CONSTRAINTS
+   ========================================================================== */
+body {
+  margin: 0;
+  padding: 0;
+  background-image: url('/src/assets/background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-color: #000000;
+  min-height: 100dvh;
+  
+  /* Modern Geometric Sans-Serif Typographic Engine */
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Constrains desktop views to simulate a smartphone frame viewport exactly */
+.mobile-container {
+  max-width: 430px;
+  height: 100dvh;
+  margin: 0 auto;
+  background: linear-gradient(180deg, rgba(11, 23, 42, 0.95) 0%, rgba(5, 7, 12, 0.98) 100%);
+  color: var(--text-main);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 40px rgba(0,0,0,0.8);
+}
+
+.mobile-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  padding-bottom: 160px; /* Safe padding above players and nav */
+}
+
+.mobile-content::-webkit-scrollbar {
+  display: none;
+}
+/* ==========================================================================
+   14. COMPLETELY HIDE NATIVE WINDOW & CONTAINER SCROLLBARS
+   ========================================================================== */
+
+/* Target the brand-new fullscreen mobile layout views and main document html/body */
+html,
+body,
+.mobile-container,
+.mobile-content,
+.mobile-content-fullscreen,
+.lyrics-scroll-deck-view,
+.dropdown-scroll-container {
+  scrollbar-width: none !important; /* For Firefox */
+  -ms-overflow-style: none !important;  /* For Internet Explorer and Edge */
+}
+
+/* Target Webkit engines for Chrome, Safari, and newer Edge instances */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.mobile-container::-webkit-scrollbar,
+.mobile-content::-webkit-scrollbar,
+.mobile-content-fullscreen::-webkit-scrollbar,
+.lyrics-scroll-deck-view::-webkit-scrollbar,
+.dropdown-scroll-container::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+/* ==========================================================================
+   1. GLOBAL ROOT SELECTION LAYER CONTAINER WIDTHS
+   ========================================================================== */
+.mobile-container {
+  position: relative;
+  
+  /* 🚀 CHANGE WIDTH HERE: Upscale this value to expand the boundaries of your app layout */
+  width: 100%;             /* Allow full flexible stretching */
+  max-width: 480px;        /* 💡 Increase this to 600px, 768px (Tablet), or 100% to fill the screen */
+  
+  /* Retain mobile centered viewport frame aspect layout metrics */
+  min-height: 100vh;
+  margin: 0 auto;
+  background-color: #05070c;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Ensure absolute modal sliders (like FullPlayer, Profiles, Sheets) dynamically fill the container boundaries */
+.mobile-content,
+.login-screen-wrapper,
+.loading-screen-wrapper,
+.premium-dropdown-menu {
+  width: 100%;
+  box-sizing: border-box;
+}
+/* 🚀 Turn off the default blue tap highlight box on all clickable items */
+button, 
+.mini-player, 
+.full-player-view icon, /* add whatever class tags your player buttons use */
+a {
+  -webkit-tap-highlight-color: transparent !important;
+}
+* {
+  -webkit-tap-highlight-color: transparent !important;
+}
