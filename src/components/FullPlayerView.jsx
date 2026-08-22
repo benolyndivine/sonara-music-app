@@ -15,6 +15,14 @@ export default function FullPlayerView({
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // 🍞 Internal UI Feedback Alert
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const displayToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
   useEffect(() => {
     if (currentTrack) {
       setIsDownloaded(isTrackCachedOffline(currentTrack.id));
@@ -35,7 +43,6 @@ export default function FullPlayerView({
 
   const progressPercent = trackDuration > 0 ? (trackProgress / trackDuration) * 100 : 0;
 
-  // 🚀 Native Share API Sheet Handler
   const handleShareSong = async () => {
     setShowMoreMenu(false);
     const shareData = {
@@ -49,23 +56,22 @@ export default function FullPlayerView({
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-        alert('Song share link copied to clipboard!');
+        displayToast('Song share link copied to clipboard!');
       }
     } catch (err) {
       console.log("Share sheet dismissed:", err);
     }
   };
 
-  // 🚀 Single Track Caching Storage Handler
   const handleDownloadClick = async () => {
     if (isDownloaded || isDownloading) return;
     try {
       setIsDownloading(true);
       await downloadTrackToDevice(currentTrack);
       setIsDownloaded(true);
-      alert(`"${resolvedTitle}" saved for offline playback!`);
+      displayToast(`Saved "${resolvedTitle}" offline!`);
     } catch (err) {
-      alert("Offline cache transfer failed.");
+      displayToast("Offline download failed.");
     } finally {
       setIsDownloading(false);
     }
@@ -75,7 +81,7 @@ export default function FullPlayerView({
     const songUrl = currentTrack.songUrl || currentTrack.audioUrl || '';
     if (songUrl) {
       navigator.clipboard.writeText(songUrl);
-      alert('Track audio link copied to clipboard!');
+      displayToast('Track audio link copied!');
     }
     setShowMoreMenu(false);
   };
@@ -85,12 +91,6 @@ export default function FullPlayerView({
     setShowMoreMenu(false);
   };
 
-  // 🛠️ FIX: resolvedTitle can be undefined when a track has neither .title
-  // nor .name, and lyrics docs are looked up by matching their Firestore
-  // doc id against the track's title — calling .toLowerCase() on either
-  // side unguarded crashed the whole player the moment either was missing.
-  // Also trims/collapses whitespace so a stray extra space in either the
-  // song title or the lyrics doc id doesn't silently break the match.
   const normalizeForLyricsMatch = (str) => (str || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const activeTrackLyrics = lyrics.find(
     item => normalizeForLyricsMatch(item.id) === normalizeForLyricsMatch(resolvedTitle)
@@ -105,6 +105,31 @@ export default function FullPlayerView({
         boxSizing: 'border-box', overflow: 'hidden'
       }}
     >
+      {/* Internal Floating Toast Indicator */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '32px',
+            left: '24px',
+            right: '24px',
+            zIndex: 9999,
+            backgroundColor: '#0d2218',
+            border: '1px solid var(--accent)',
+            borderRadius: '14px',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            animation: 'slideDownToast 0.25s ease'
+          }}
+        >
+          <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Blurred Cover Background */}
       <div 
         style={{
@@ -160,7 +185,6 @@ export default function FullPlayerView({
             </div>
             
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexShrink: 0, position: 'relative' }}>
-              {/* Standalone Offline Download Option */}
               <button 
                 onClick={handleDownloadClick}
                 style={{ background: 'none', border: 'none', color: isDownloaded ? 'var(--accent)' : '#ffffff', fontSize: '1.25rem', cursor: 'pointer', padding: '4px' }}
@@ -169,7 +193,6 @@ export default function FullPlayerView({
                 <i className={isDownloading ? "fa-solid fa-spinner fa-spin" : isDownloaded ? "fa-solid fa-circle-down" : "fa-solid fa-download"}></i>
               </button>
 
-              {/* Standalone Quick Share Sheet Controller */}
               <button 
                 onClick={handleShareSong}
                 style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.25rem', cursor: 'pointer', padding: '4px' }}
@@ -350,7 +373,6 @@ export default function FullPlayerView({
                 <i className="fa-solid fa-compact-disc sheet-icon"></i> Go to Album
               </button>
 
-              {/* 🛠️ ADDED: OFFLINE DOWNLOAD ROW OPTION IN THE BOTTOM ACTION SHEET CONTAINER */}
               <button 
                 className="sheet-action-row-item" 
                 onClick={() => {
@@ -371,7 +393,6 @@ export default function FullPlayerView({
                 <i className="fa-solid fa-link sheet-icon"></i> Copy Raw Track Link
               </button>
 
-              {/* Operates the Toggle View switcher to overlay Lyrics Sheet */}
               <button 
                 className="sheet-action-row-item" 
                 onClick={() => {
@@ -390,7 +411,7 @@ export default function FullPlayerView({
         </div>
       )}
 
-      {/* 📜 📱 SLIDE-UP DEDICATED FULL LYRICS SHEET LAYOUT */}
+      {/* 📜 SLIDE-UP DEDICATED FULL LYRICS SHEET LAYOUT */}
       {showLyricsSheet && (
         <div 
           style={{
@@ -400,7 +421,6 @@ export default function FullPlayerView({
             boxSizing: 'border-box', animation: 'slideUpSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
         >
-          {/* Header Rows */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px' }}>
             <div>
               <p style={{ margin: '0 0 4px 0', fontSize: '0.75rem', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '1px' }}>Lyrics Panel</p>
@@ -417,7 +437,6 @@ export default function FullPlayerView({
             </button>
           </div>
 
-          {/* Dynamic Text Lyrics Scrollbox Body Container */}
           <div 
             style={{
               flex: 1, overflowY: 'auto', paddingRight: '4px',

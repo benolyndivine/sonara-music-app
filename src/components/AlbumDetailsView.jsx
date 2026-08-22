@@ -8,8 +8,14 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
   const [downloadedMap, setDownloadedMap] = useState({});
   const [batchDownloading, setBatchDownloading] = useState(false);
   const [isSavedInLibrary, setIsSavedInLibrary] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
   const albumTracks = songs.filter(song => song.albumId === album.id);
+
+  const displayToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
 
   useEffect(() => {
     const audit = {};
@@ -23,6 +29,7 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
     const targetState = !isSavedInLibrary;
     setIsSavedInLibrary(targetState);
     setAlbumSaved(album.id, targetState);
+    displayToast(targetState ? 'Saved album to your library' : 'Removed album from library');
   };
 
   const handleDownloadTrack = async (e, song) => {
@@ -31,8 +38,10 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
       setDownloadedMap(prev => ({ ...prev, [song.id]: 'loading' }));
       await downloadTrackToDevice(song);
       setDownloadedMap(prev => ({ ...prev, [song.id]: true }));
+      displayToast(`"${song.title || song.name}" saved offline!`);
     } catch {
       setDownloadedMap(prev => ({ ...prev, [song.id]: false }));
+      displayToast("Download failed. Check your network.");
     }
     setActiveMenuId(null);
   };
@@ -48,15 +57,14 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
           setDownloadedMap(prev => ({ ...prev, [song.id]: true }));
         }
       }
-      alert(`"${album.name}" download finished!`);
+      displayToast(`"${album.name}" downloaded for offline playback!`);
     } catch {
-      alert("Batch transmission interrupted.");
+      displayToast("Batch download interrupted.");
     } finally {
       setBatchDownloading(false);
     }
   };
 
-  // 🚀 Upgraded Album Share Sheet Engine Hook
   const handleShareAlbum = async () => {
     const shareData = {
       title: album.name,
@@ -69,7 +77,7 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-        alert("Album share details copied to clipboard!");
+        displayToast("Album link copied to clipboard!");
       }
     } catch (err) {
       console.log("Album share sheet dismissed:", err);
@@ -81,20 +89,32 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
     const isSongFromAlbumPlaying = albumTracks.some(track => currentTrack && track.id === currentTrack.id);
     if (isSongFromAlbumPlaying) {
       onTogglePlay();
+    } else if (isShuffle) {
+      const randomIdx = Math.floor(Math.random() * albumTracks.length);
+      onSelectTrack(albumTracks[randomIdx], albumTracks);
     } else {
       onSelectTrack(albumTracks[0], albumTracks);
     }
   };
 
-  // 🛠️ FIX: album.artist (or an artist doc missing .name) can be undefined —
-  // calling .toLowerCase() directly crashed this entire view the moment a
-  // single malformed record showed up. Normalize both sides to '' first.
   const matchingArtistData = artists?.find(a => (a.name || '').toLowerCase() === (album.artist || '').toLowerCase());
   const artistProfileImg = matchingArtistData?.image;
   const isAlbumCurrentlyActiveAndPlaying = isPlaying && albumTracks.some(track => currentTrack && track.id === currentTrack.id);
 
   return (
-    <div className="mobile-content" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: 0, paddingBottom: '160px' }}>
+    <div className="mobile-content" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: 0, paddingBottom: '160px', position: 'relative' }}>
+      {toastMessage && (
+        <div style={{
+          position: 'fixed', top: '24px', left: '20px', right: '20px', zIndex: 9999,
+          backgroundColor: '#0d2218', border: '1px solid var(--accent)', borderRadius: '14px',
+          padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
+        }}>
+          <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+        </div>
+      )}
+
       <div style={{ padding: '0 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', padding: '14px 0 10px 0' }}>
           <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}><i className="fa-solid fa-arrow-left"></i></button>
@@ -120,10 +140,9 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
             </button>
 
             <button onClick={handleBatchDownloadAlbum} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>
-              <i className={batchDownloading ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"}></i>
+              <i className={batchDownloading ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"} style={{ color: batchDownloading ? 'var(--accent)' : '#ffffff' }}></i>
             </button>
 
-            {/* 🛠️ UPGRADED: Album share option utilizes unified system engine */}
             <button onClick={handleShareAlbum} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>
               <i className="fa-solid fa-arrow-up-from-bracket"></i>
             </button>
@@ -132,8 +151,8 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
               <button onClick={() => setShowHeaderMenu(!showHeaderMenu)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}><i className="fa-solid fa-ellipsis-vertical"></i></button>
               {showHeaderMenu && (
                 <div className="premium-dropdown-menu" style={{ left: '0', top: '30px', position: 'absolute', zIndex: 600 }}>
-                  <button onClick={() => { alert(`Added album "${album.name}" to streaming queue.`); setShowHeaderMenu(false); }} className="dropdown-playlist-option" style={{ padding: '12px 14px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', color: '#ffffff', cursor: 'pointer', fontSize: '0.9rem' }}>Add to queue</button>
-                  <button onClick={() => { alert("Reporting content parameters to servers."); setShowHeaderMenu(false); }} className="dropdown-playlist-option" style={{ padding: '12px 14px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', color: '#ff4d4d', cursor: 'pointer', fontSize: '0.9rem' }}>Report Explicit Art</button>
+                  <button onClick={() => { displayToast(`Added album "${album.name}" to queue.`); setShowHeaderMenu(false); }} className="dropdown-playlist-option" style={{ padding: '12px 14px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', color: '#ffffff', cursor: 'pointer', fontSize: '0.9rem' }}>Add to queue</button>
+                  <button onClick={() => { displayToast("Reporting content parameters to servers."); setShowHeaderMenu(false); }} className="dropdown-playlist-option" style={{ padding: '12px 14px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', color: '#ff4d4d', cursor: 'pointer', fontSize: '0.9rem' }}>Report Explicit Art</button>
                 </div>
               )}
             </div>

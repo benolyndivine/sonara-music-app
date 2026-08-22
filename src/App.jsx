@@ -24,6 +24,8 @@ import SearchView from './components/SearchView';
 import LibraryView from './components/LibraryView';
 import FullPlayerView from './components/FullPlayerView';
 import ProfileDrawerView from './components/ProfileDrawerView';
+import NotificationCenter from './components/NotificationCenter';
+import DownloadCenterView from './components/DownloadCenterView';
 import SettingsView from './components/SettingsView';
 import AlbumDetailsView from './components/AlbumDetailsView'; 
 import ArtistDetailsView from './components/ArtistDetailsView';
@@ -34,8 +36,20 @@ import ManageLyricsView from './components/ManageLyricsView';
 import logo from './assets/logo3.png';
 import './App.css';
 
+const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+
+const shuffleArray = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [songs, setSongs] = useState([]);
   const [artists, setArtists] = useState([]);
   const [playlists, setPlaylists] = useState([]);
@@ -48,24 +62,33 @@ export default function App() {
   const [selectedAlbum, setSelectedAlbum] = useState(null); 
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [libraryActiveTab, setLibraryActiveTab] = useState('playlists');
-  // 🛠️ FIX: was local state inside LibraryView, invisible to the back-button
-  // history stack below — see the matching comment in LibraryView.jsx.
-  // Lifting it up here means "open a playlist" becomes a real navigation
-  // step that Android back can unwind, same as selectedAlbum/selectedArtist.
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
 
   const [currentView, setCurrentView] = useState('home');
   const [currentQueue, setCurrentQueue] = useState([]);
-  // 🌐 NETWORK CONNECTIVITY STATE — drives the offline UI + local-only playback
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const wasOnlineRef = useRef(navigator.onLine);
   const [showFullPlayer, setShowFullPlayer] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showDownloads, setShowDownloads] = useState(false);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showUploadSong, setShowUploadSong] = useState(false);
   const [showManageAlbums, setShowManageAlbums] = useState(false);
   const [showManageArtists, setShowManageArtists] = useState(false);
   const [showManageLyrics, setShowManageLyrics] = useState(false);
+
+  const [toast, setToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = (message, type = 'success', icon = null) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type, icon });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2800);
+  };
 
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
@@ -77,26 +100,50 @@ export default function App() {
   const [automaticallySendDiagnostics, setAutomaticallySendDiagnostics] = useState(true);
 
   const [contentRestrictions, setContentRestrictions] = useState(false);
-  const [appTheme, setAppTheme] = useState('#1db954'); // 🎨 Accent color hex, applied as --accent below
+  const [appTheme, setAppTheme] = useState('#1db954');
   const [motionEnabled, setMotionEnabled] = useState(true);
   const [lyricsSize, setLyricsSize] = useState('Normal');
 
-  const audioRef = useRef(null);          // Web/PWA fallback: HTML5 <audio>
-  const mediaRef = useRef(null);          // Native: Cordova Media instance
-  const loadedNativeTrackIdRef = useRef(null); // Which track id is currently loaded into mediaRef
-  const nativeProgressIntervalRef = useRef(null); // Polls native position/duration (no native timeupdate event exists)
+  const audioRef = useRef(null);
+  const mediaRef = useRef(null);
+  const loadedNativeTrackIdRef = useRef(null);
+  const nativeProgressIntervalRef = useRef(null);
   const prefetchAudioRef = useRef(null);
   const nextTrackRef = useRef(null);
   const sleepTimerRef = useRef(null);
-  // Timestamp of the last track switch — used to ignore the spurious
-  // 'pause' command some Android/Bluetooth media transports send during
-  // the brief audio-focus renegotiation window right after a track change.
   const lastTrackChangeAtRef = useRef(0);
   const TRANSPORT_PAUSE_GRACE_MS = 700;
 
-  // ─────────────────────────────────────────────────────────────
-  // 📱 FULL-SCREEN STATUS BAR OVERLAY & COLOR HARMONIZATION
-  // ─────────────────────────────────────────────────────────────
+  const shuffleBagRef = useRef([]);
+  const playHistoryRef = useRef([]);
+
+  const updateUnreadNotificationStatus = (songList = songs) => {
+    try {
+      const readIds = JSON.parse(localStorage.getItem('sonara_read_notifications') || '[]');
+      const clearedIds = JSON.parse(localStorage.getItem('sonara_cleared_notifications') || '[]');
+      const now = Date.now();
+      
+      const unreadRecentSongExists = songList.some((song) => {
+        if (clearedIds.includes(song.id) || readIds.includes(song.id)) return false;
+        let time = 0;
+        if (song.createdAt?.seconds) time = song.createdAt.seconds * 1000;
+        else if (song.createdAt?.toMillis) time = song.createdAt.toMillis();
+        else if (song.uploadedAt) time = new Date(song.uploadedAt).getTime();
+        else if (song.createdAt) time = new Date(song.createdAt).getTime();
+
+        return time > 0 && (now - time) <= TWO_DAYS_MS;
+      });
+
+      setHasUnreadNotifications(unreadRecentSongExists);
+    } catch {
+      setHasUnreadNotifications(false);
+    }
+  };
+
+  useEffect(() => {
+    updateUnreadNotificationStatus(songs);
+  }, [songs]);
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
@@ -113,9 +160,6 @@ export default function App() {
     configureStatusBar();
   }, []);
 
-  // ─────────────────────────────────────────────────────────────
-  // 💾 STORAGE PERMISSION HANDLER
-  // ─────────────────────────────────────────────────────────────
   const ensureStoragePermission = async () => {
     if (!Capacitor.isNativePlatform()) return true;
     try {
@@ -132,26 +176,23 @@ export default function App() {
   const handleDownloadSong = async (song) => {
     const hasPermission = await ensureStoragePermission();
     if (!hasPermission) {
-      alert("Storage permission is required to save songs offline.");
+      showToast("Storage permission is required to save songs offline.", "error", "fa-triangle-exclamation");
       return;
     }
     try {
       await downloadTrackToDevice(song);
-      alert(`"${song.title || song.name}" downloaded for offline playback!`);
+      showToast(`"${song.title || song.name}" saved offline!`, "success", "fa-circle-down");
     } catch (err) {
       console.error('Download failed:', err);
-      alert('Failed to download track.');
+      showToast("Failed to download track.", "error", "fa-circle-xmark");
     }
   };
 
-  // ─────────────────────────────────────────────────────────────
-  // 🕘 NAVIGATION HISTORY STACK (Tracks primary root & sub-pages)
-  // ─────────────────────────────────────────────────────────────
   const screenSnapshotRef = useRef({
     currentView, selectedAlbum, selectedArtist, libraryActiveTab, selectedPlaylist
   });
-  const navHistoryRef = useRef([]); // stack of previous snapshots, oldest first
-  const isBackNavigationRef = useRef(false); // true while applying a popped snapshot, so it isn't re-pushed
+  const navHistoryRef = useRef([]);
+  const isBackNavigationRef = useRef(false);
 
   useEffect(() => {
     const nextSnapshot = { currentView, selectedAlbum, selectedArtist, libraryActiveTab, selectedPlaylist };
@@ -162,49 +203,42 @@ export default function App() {
       prevSnapshot.selectedAlbum !== nextSnapshot.selectedAlbum ||
       prevSnapshot.selectedArtist !== nextSnapshot.selectedArtist ||
       prevSnapshot.libraryActiveTab !== nextSnapshot.libraryActiveTab ||
-      // Compare by id, not object reference: renaming the open playlist
-      // (handleInlineRenameSave) rebuilds the selectedPlaylist object with
-      // a new reference but the same id — that's a metadata update, not a
-      // navigation step, so it shouldn't push a new back-stack entry.
       (prevSnapshot.selectedPlaylist?.id ?? null) !== (nextSnapshot.selectedPlaylist?.id ?? null);
 
     if (didChange) {
       if (isBackNavigationRef.current) {
-        // This change is the result of popping the stack in the back
-        // button handler below — don't record it again as a forward step.
         isBackNavigationRef.current = false;
       } else {
         navHistoryRef.current.push(prevSnapshot);
       }
     }
-    // Always resync the ref to the latest values, even when nothing worth
-    // pushing to history changed (e.g. selectedPlaylist got a fresh object
-    // reference from a rename) — otherwise a later, unrelated navigation
-    // step would push this stale snapshot, and popping back into it later
-    // would briefly show the pre-rename playlist name.
     screenSnapshotRef.current = nextSnapshot;
   }, [currentView, selectedAlbum, selectedArtist, libraryActiveTab, selectedPlaylist]);
 
-  // ─────────────────────────────────────────────────────────────
-  // 📱 HIERARCHICAL ANDROID HARDWARE BACK BUTTON SEQUENCE
-  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
     const backButtonListener = CapacitorApp.addListener('backButton', () => {
-      // 1. Close full player overlay first
       if (showFullPlayer) {
         setShowFullPlayer(false);
         return;
       }
 
-      // 2. Close active Settings view and return to Profile Drawer
+      if (showDownloads) {
+        setShowDownloads(false);
+        return;
+      }
+
+      if (showNotifications) {
+        setShowNotifications(false);
+        return;
+      }
+
       if (showSettings) {
         setShowSettings(false);
         return;
       }
 
-      // 3. Close Admin Studio views and return to Profile Drawer
       if (showUploadSong) {
         setShowUploadSong(false);
         return;
@@ -222,19 +256,16 @@ export default function App() {
         return;
       }
 
-      // 4. Close Profile Drawer
       if (showProfile) {
         setShowProfile(false);
         return;
       }
 
-      // 5. Close playlist detail view inside Library
       if (selectedPlaylist) {
         setSelectedPlaylist(null);
         return;
       }
 
-      // 6. Close album or artist details view
       if (selectedAlbum) {
         setSelectedAlbum(null);
         return;
@@ -244,7 +275,6 @@ export default function App() {
         return;
       }
 
-      // 7. Unwind nested history stack (views & tabs)
       const previous = navHistoryRef.current.pop();
       if (previous) {
         isBackNavigationRef.current = true;
@@ -254,10 +284,8 @@ export default function App() {
         setLibraryActiveTab(previous.libraryActiveTab);
         setSelectedPlaylist(previous.selectedPlaylist);
       } else if (currentView !== 'home') {
-        // Fallback: If not on Home tab, return to Home
         setCurrentView('home');
       } else {
-        // At root Home: minimize the application
         CapacitorApp.minimizeApp();
       }
     });
@@ -267,6 +295,8 @@ export default function App() {
     };
   }, [
     showFullPlayer,
+    showDownloads,
+    showNotifications,
     showSettings,
     showUploadSong,
     showManageAlbums,
@@ -279,17 +309,11 @@ export default function App() {
     currentView
   ]);
 
-  // Mutable mirror of audio-relevant state to survive OS thread freezing and
-  // background closure scopes (native playback callbacks read this instead
-  // of closing over potentially-stale state).
   const audioStateRef = useRef({ songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying });
   useEffect(() => {
     audioStateRef.current = { songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying };
   }, [songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying]);
 
-  // ─────────────────────────────────────────────────────────────
-  // 🌐 NETWORK CONNECTIVITY LISTENER
-  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const goOnline = () => setIsOnline(true);
     const goOffline = () => setIsOnline(false);
@@ -301,16 +325,12 @@ export default function App() {
     };
   }, []);
 
-  // Block Home & Search while offline — bounce the user to the Library
-  // (Downloaded tab) instead, since those views need a live connection.
   useEffect(() => {
     if (!isOnline && (currentView === 'home' || currentView === 'search')) {
       setCurrentView('library');
     }
   }, [isOnline, currentView]);
 
-  // 🔁 When the connection comes back, take the user straight to Home —
-  // regardless of which view they were stuck on while offline.
   useEffect(() => {
     if (isOnline && !wasOnlineRef.current) {
       setCurrentView('home');
@@ -318,19 +338,14 @@ export default function App() {
     wasOnlineRef.current = isOnline;
   }, [isOnline]);
 
-  // ─────────────────────────────────────────────────────────────
-  // 🔐 AUTH STATE LISTENER
-  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser ?? null);
+      if (!currentUser) setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // ─────────────────────────────────────────────────────────────
-  // 🔊 UNLOCK NATIVE AUDIO RIG
-  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (Capacitor.isNativePlatform()) return;
     const unlock = () => {
@@ -349,9 +364,6 @@ export default function App() {
     };
   }, []);
 
-  // ─────────────────────────────────────────────────────────────
-  // 👁️ VISIBILITY SELF-HEAL (covers regular web/PWA background/lock-screen case)
-  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return;
@@ -373,12 +385,9 @@ export default function App() {
 
       const audio = audioRef.current;
       if (!audio) return;
-      // If the track actually finished while the tab/screen was inactive and
-      // the 'ended' event never got a chance to update state, advance now.
       if (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.5)) {
         triggerNextTrackLogic();
       } else if (audioStateRef.current.isPlaying && audio.paused) {
-        // Resync: some mobile browsers silently pause background audio.
         audio.play().catch(() => {});
       }
     };
@@ -386,9 +395,6 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // ─────────────────────────────────────────────────────────────
-  // 🚀 BACKGROUND ENGINE AND MEDIA INTERCEPTOR WAKELOCKS
-  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     let bgListenerHandle, fgListenerHandle;
 
@@ -396,10 +402,6 @@ export default function App() {
       if (!Capacitor.isNativePlatform()) return;
 
       try {
-        // 0. Request notification permission FIRST. On Android 13+ the
-        //    persistent foreground-service notification requires POST_NOTIFICATIONS;
-        //    without it, Android can silently kill the background service that
-        //    keeps audio/JS alive once the screen turns off.
         try {
           const notifStatus = await BackgroundMode.checkNotificationsPermission();
           if (notifStatus?.status !== 'granted') {
@@ -409,7 +411,6 @@ export default function App() {
           console.warn('Notification permission check failed:', permErr);
         }
 
-        // 1. Force background engine alive flag and configure notification channel
         await BackgroundMode.enable({
           title: "Sonara",
           text: "Streaming your audio timeline...",
@@ -419,21 +420,8 @@ export default function App() {
           bigText: true
         });
 
-        // 2. 🚀 THE ACTUAL FIX for "next song doesn't play / playback pauses
-        //    when the screen is off or the app is minimized":
-        //    Stock Android suspends a WebView's JS event loop a few minutes
-        //    after it's hidden. That freezes the audio element's 'timeupdate'
-        //    and 'ended' events, so the queue never advances and play/pause
-        //    commands stop being processed until you reopen the app.
-        //    disableWebViewOptimizations() tells Android to keep this app's
-        //    WebView thread running normally even while backgrounded.
         await BackgroundMode.disableWebViewOptimizations();
 
-        // 3. Ask the OS to exempt us from Doze-mode battery throttling too
-        //    (kicks in after ~40 min backgrounded on top of the WebView freeze).
-        //    NOTE: the previous code called a method name that doesn't exist
-        //    on this plugin ("disableBatteryOptimizations"), so this request
-        //    was silently never sent.
         try {
           const battStatus = await BackgroundMode.checkBatteryOptimizations();
           if (battStatus?.enabled) {
@@ -443,16 +431,11 @@ export default function App() {
           console.warn('Battery optimization request failed:', battErr);
         }
 
-        // 4. Map Media Action Interceptors directly to persistent hardware refs
         await MediaSession.setActionHandler({ action: 'play' }, () => {
           setIsPlaying(true);
         });
 
         await MediaSession.setActionHandler({ action: 'pause' }, () => {
-          // 🛠️ Ignore transport 'pause' commands that arrive in the split
-          // second right after a track switch — that's the OS/Bluetooth
-          // device reacting to the audio-focus blip of loading the new
-          // track, not the user actually pressing pause.
           if (Date.now() - lastTrackChangeAtRef.current < TRANSPORT_PAUSE_GRACE_MS) {
             return;
           }
@@ -471,17 +454,10 @@ export default function App() {
           if (details?.seekTime != null) handleSeekProgress(details.seekTime); 
         });
 
-        // 5. Some OEM Android skins (Xiaomi/MIUI, Oppo/ColorOS, Samsung) re-apply
-        //    their own WebView throttling on top of stock Android whenever the
-        //    app re-enters the background, so re-assert the override every time.
         bgListenerHandle = await BackgroundMode.addListener('appInBackground', async () => {
           try { await BackgroundMode.disableWebViewOptimizations(); } catch (_) {}
         });
 
-        // 6. 🔄 Self-heal on resume: if the current track actually finished
-        //    while the screen was off (event got dropped despite the fix
-        //    above, e.g. on an older OS build), catch up the instant the app
-        //    comes back to the foreground instead of sitting stuck on a dead track.
         fgListenerHandle = await BackgroundMode.addListener('appInForeground', () => {
           const media = mediaRef.current;
           if (!media) return;
@@ -501,10 +477,6 @@ export default function App() {
 
     initBackgroundServices();
 
-    // 🛠️ Native watchdog: the Cordova Media plugin's onSuccess callback can
-    // occasionally be delayed by the JS bridge while backgrounded. Poll every
-    // few seconds and force the queue forward if we detect the track actually
-    // finished but the callback never arrived.
     const nativeWatchdogInterval = setInterval(() => {
       if (!Capacitor.isNativePlatform() || !audioStateRef.current.isPlaying) return;
       const media = mediaRef.current;
@@ -525,9 +497,6 @@ export default function App() {
     };
   }, []);
 
-  // ─────────────────────────────────────────────────────────────
-  // 🔮 REFACTORED MUTABLE MEDIA ADVANCEMENT LOOP 
-  // ─────────────────────────────────────────────────────────────
   const triggerNextTrackLogic = () => {
     const { songs: s, currentQueue: q, currentTrack: t, isShuffle: sh } = audioStateRef.current;
     const queue = q.length > 0 ? q : s;
@@ -535,12 +504,21 @@ export default function App() {
     
     let next;
     if (sh) {
-      next = queue[Math.floor(Math.random() * queue.length)];
+      if (queue.length > 1) {
+        if (!shuffleBagRef.current || shuffleBagRef.current.length === 0) {
+          const remainingIds = queue.filter(track => track.id !== t?.id).map(track => track.id);
+          shuffleBagRef.current = shuffleArray(remainingIds);
+        }
+        const nextId = shuffleBagRef.current.shift();
+        next = queue.find(track => track.id === nextId) || queue[0];
+      } else {
+        next = queue[0];
+      }
     } else {
       const idx = queue.findIndex(track => track.id === t?.id);
       next = queue[(idx + 1) % queue.length];
     }
-    handleTrackSelection(next, queue);
+    handleTrackSelection(next, queue, false);
   };
 
   const triggerPrevTrackLogic = () => {
@@ -548,23 +526,37 @@ export default function App() {
     const queue = q.length > 0 ? q : s;
     if (!queue.length) return;
 
+    if (playHistoryRef.current.length > 0) {
+      const prevTrack = playHistoryRef.current.pop();
+      if (prevTrack && queue.some(track => track.id === prevTrack.id)) {
+        setCurrentTrack(prevTrack);
+        setIsPlaying(true);
+        return;
+      }
+    }
+
     const idx = queue.findIndex(track => track.id === t?.id);
     const prev = queue[(idx - 1 + queue.length) % queue.length];
-    handleTrackSelection(prev, queue);
+    handleTrackSelection(prev, queue, false);
   };
 
-  // ─────────────────────────────────────────────────────────────
-  // 🔊 NATIVE AUDIO ENGINE (Cordova Media — real OS-level playback,
-  // independent of the WebView's JS thread getting frozen/throttled)
-  // ─────────────────────────────────────────────────────────────
+  const toggleShuffle = () => {
+    setIsShuffle(prev => {
+      const nextVal = !prev;
+      if (nextVal) {
+        const queue = currentQueue.length > 0 ? currentQueue : songs;
+        const remainingIds = queue.filter(track => track.id !== currentTrack?.id).map(track => track.id);
+        shuffleBagRef.current = shuffleArray(remainingIds);
+      }
+      return nextVal;
+    });
+  };
+
   const startNativeTrack = (track, autoplay = true) => {
     if (!track) return;
-    // Prefer the locally downloaded copy if one exists, so playback keeps
-    // working with no network connection; falls back to the remote URL.
     const url = getPlaybackSource(track);
     if (!url) return;
 
-    // Tear down whatever was previously loaded
     if (mediaRef.current) {
       try { mediaRef.current.stop(); } catch (_) {}
       try { mediaRef.current.release(); } catch (_) {}
@@ -589,12 +581,8 @@ export default function App() {
     }
     mediaRef.current = media;
 
-    // Fires when the track finishes playing naturally (real track-end,
-    // not a pause/seek) — this is our native equivalent of the HTML5
-    // 'ended' event, and it keeps firing even while the app is
-    // backgrounded/screen-off since it's driven by the native player.
     media.onSuccess.subscribe(() => {
-      if (loadedNativeTrackIdRef.current !== track.id) return; // stale callback from a since-replaced track
+      if (loadedNativeTrackIdRef.current !== track.id) return;
       const { isRepeat: r } = audioStateRef.current;
       if (r) {
         startNativeTrack(track, true);
@@ -615,8 +603,6 @@ export default function App() {
       media.play();
     }
 
-    // The Cordova Media plugin has no continuous position event, so we poll
-    // it ourselves to keep the progress bar and lock-screen scrubber in sync.
     nativeProgressIntervalRef.current = setInterval(() => {
       const m = mediaRef.current;
       if (!m) return;
@@ -637,7 +623,6 @@ export default function App() {
     }, 500);
   };
 
-  // Tear down the native player on unmount
   useEffect(() => {
     return () => {
       if (nativeProgressIntervalRef.current) clearInterval(nativeProgressIntervalRef.current);
@@ -649,96 +634,45 @@ export default function App() {
   }, []);
 
   // ─────────────────────────────────────────────────────────────
-  // 📦 FETCH DATA WATERFALL MATRIX
+  // 📦 LIVE REAL-TIME FIRESTORE SUBSCRIPTIONS (Songs sync live across all devices)
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
+    setLoading(true);
 
-    const fetchAllData = async () => {
-      try {
-        const songsSnap = await getDocs(collection(db, 'songs'));
-        let songsList = songsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const christianAllowedEmails = [
+      'bright2013.br@gmail.com',
+      'jebarejila2@gmail.com'
+    ];
 
-        const adminEmails = [
-          'bright2013.br@gmail.com',
-          'jebarejila2@gmail.com',
-          'benolynd@gmail.com',
-          'darkrush311@gmail.com',
-          '2007kirubhasaravanan@gmail.com',
-          'ganeshjagan003@gmail.com'
-        ];
+    let unsubChristianSongs = () => {};
+    let generalSongsList = [];
+    let christianSongsList = [];
 
-        if (adminEmails.includes(user.email)) {
-          try {
-            const christianSongsSnap = await getDocs(collection(db, 'christianSongs'));
-            const christianSongsList = christianSongsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-            songsList = [...songsList, ...christianSongsList];
-          } catch (dbErr) {
-            console.error('Restricted rules blocked reading christianSongs:', dbErr);
-          }
-        }
-
-        setSongs(songsList);
-        setCurrentQueue(songsList);
-
-        try {
-          const albumsSnap = await getDocs(collection(db, 'albums'));
-          setAlbums(albumsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (albumErr) {
-          console.error('Failed to load albums collection:', albumErr);
-        }
-
-        const artistsSnap = await getDocs(collection(db, 'artists'));
-        setArtists(artistsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        const lyricsSnap = await getDocs(collection(db, 'lyrics'));
-        setLyrics(lyricsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        const playlistsQuery = query(collection(db, 'playlists'), where('uid', '==', user.uid));
-        const playlistsSnap = await getDocs(playlistsQuery);
-        setPlaylists(playlistsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        try {
-          const userStatusRef = doc(db, 'users', user.uid);
-          const userStatusSnap = await getDoc(userStatusRef);
-          
-          if (userStatusSnap.exists() && userStatusSnap.data().lastPlayedTrackId) {
-            const savedTrackId = userStatusSnap.data().lastPlayedTrackId;
-            const matchedTrack = songsList.find(s => s.id === savedTrackId);
-            
-            if (matchedTrack) {
-              setCurrentTrack(matchedTrack);
-            } else if (songsList.length > 0) {
-              setCurrentTrack(songsList[0]);
-            }
-          } else if (songsList.length > 0) {
-            setCurrentTrack(songsList[0]);
-          }
-        } catch (statusErr) {
-          console.warn('Persistence fetch skipped, falling back to first song index:', statusErr);
-          if (songsList.length > 0) setCurrentTrack(songsList[0]);
-        }
-
-      } catch (err) {
-        console.error('Data waterfall sync exception logged:', err);
-      }
+    const updateCombinedSongs = () => {
+      const combined = [...generalSongsList, ...christianSongsList];
+      setSongs(combined);
+      setCurrentQueue((prev) => (prev.length === 0 ? combined : prev));
+      updateUnreadNotificationStatus(combined);
+      setLoading(false);
     };
 
-    fetchAllData();
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const playlistsQuery = query(collection(db, 'playlists'), where('uid', '==', user.uid));
-
-    const unsubPlaylists = onSnapshot(playlistsQuery, (snap) => {
-      setPlaylists(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsubSongs = onSnapshot(collection(db, 'songs'), (snap) => {
+      generalSongsList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      updateCombinedSongs();
+    }, (err) => {
+      console.error('Songs listener error:', err);
+      setLoading(false);
     });
 
-    const unsubPlaylistSongs = onSnapshot(collection(db, 'playlistSongs'), (snap) => {
-      setPlaylistSongs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    if (christianAllowedEmails.includes(user.email)) {
+      unsubChristianSongs = onSnapshot(collection(db, 'christianSongs'), (snap) => {
+        christianSongsList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        updateCombinedSongs();
+      }, (err) => {
+        console.error('Christian songs listener error:', err);
+      });
+    }
 
     const unsubAlbums = onSnapshot(collection(db, 'albums'), (snap) => {
       setAlbums(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -752,7 +686,44 @@ export default function App() {
       setLyrics(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    return () => { unsubPlaylists(); unsubPlaylistSongs(); unsubAlbums(); unsubArtists(); unsubLyrics(); };
+    const playlistsQuery = query(collection(db, 'playlists'), where('uid', '==', user.uid));
+    const unsubPlaylists = onSnapshot(playlistsQuery, (snap) => {
+      setPlaylists(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const unsubPlaylistSongs = onSnapshot(collection(db, 'playlistSongs'), (snap) => {
+      setPlaylistSongs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const fetchUserStatus = async () => {
+      try {
+        const userStatusRef = doc(db, 'users', user.uid);
+        const userStatusSnap = await getDoc(userStatusRef);
+        if (userStatusSnap.exists() && userStatusSnap.data().lastPlayedTrackId) {
+          const savedTrackId = userStatusSnap.data().lastPlayedTrackId;
+          setTimeout(() => {
+            setSongs((latestSongs) => {
+              const matched = latestSongs.find(s => s.id === savedTrackId);
+              if (matched) setCurrentTrack(matched);
+              return latestSongs;
+            });
+          }, 500);
+        }
+      } catch (err) {
+        console.error('Failed to load user last played status:', err);
+      }
+    };
+    fetchUserStatus();
+
+    return () => {
+      unsubSongs();
+      unsubChristianSongs();
+      unsubAlbums();
+      unsubArtists();
+      unsubLyrics();
+      unsubPlaylists();
+      unsubPlaylistSongs();
+    };
   }, [user]);
 
   // ─────────────────────────────────────────────────────────────
@@ -760,8 +731,6 @@ export default function App() {
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentTrack) return;
-    // Prefer the locally downloaded copy if one exists, so playback keeps
-    // working with no network connection; falls back to the remote URL.
     const trackUrl = getPlaybackSource(currentTrack);
     if (!trackUrl) return;
 
@@ -773,12 +742,6 @@ export default function App() {
         : 'https://placehold.co/512x512/0b111e/1db954.png';
 
     if (Capacitor.isNativePlatform()) {
-      // 🚀 Native platforms use the Cordova Media plugin for real OS-level
-      // playback (see startNativeTrack). That engine — creating/loading/
-      // switching the actual audio — is driven entirely from the STREAM
-      // SYSTEM SYNC effect below, since only that effect knows whether this
-      // is a genuinely new track or just a play/pause toggle on the same one.
-      // Here we only need to push the lock-screen/notification metadata.
       MediaSession.setMetadata({
         title:  currentTrack.title  || currentTrack.name  || 'Unknown Title',
         artist: currentTrack.artist || 'Unknown Artist',
@@ -795,7 +758,6 @@ export default function App() {
       return;
     }
 
-    // ── Web / PWA fallback: HTML5 <audio> element ──
     if (!audioRef.current) {
       audioRef.current = new Audio();
       audioRef.current.setAttribute('playsinline', '');
@@ -804,26 +766,13 @@ export default function App() {
 
     const resolvedUrl = new URL(trackUrl, window.location.href).href;
     if (audioRef.current.src !== resolvedUrl) {
-      // Mark the switch time BEFORE mutating .src — some OS/Bluetooth media
-      // transports fire a stray 'pause' the instant the audio element's
-      // resource changes (audio focus renegotiation). We use this timestamp
-      // to ignore that spurious command below instead of honoring it.
       lastTrackChangeAtRef.current = Date.now();
 
       audioRef.current.preload = 'auto';
       audioRef.current.src = trackUrl;
-      // 🛠️ Intentionally NOT calling .load() here: setting .src already
-      // triggers the browser's media-load algorithm. The extra explicit
-      // .load() call caused a brief native pause/reset blip on some Android
-      // WebViews during the transition, which the OS then echoed back to us
-      // as a genuine transport 'pause' command — pausing the *next* song
-      // right after it started.
       setTrackProgress(0);
       setTrackDuration(0);
 
-      // Immediately reflect "playing" on the OS media session so there's no
-      // ambiguous/"none" playback-state window for a transport control to
-      // misinterpret while the new track buffers.
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'playing';
       }
@@ -884,12 +833,8 @@ export default function App() {
       const isNewTrack = loadedNativeTrackIdRef.current !== currentTrack.id;
 
       if (isNewTrack) {
-        // Genuinely different track — (re)create the native player for it.
         startNativeTrack(currentTrack, isPlaying);
       } else if (mediaRef.current) {
-        // Same track — just toggle play/pause, don't recreate the player
-        // (recreating it was the bug that restarted the song from 0 every
-        // time you resumed after pausing).
         if (isPlaying) {
           mediaRef.current.play();
         } else {
@@ -900,7 +845,6 @@ export default function App() {
       return;
     }
 
-    // ── Web / PWA fallback ──
     if (!audioRef.current || !audioRef.current.src) return;
 
     if (isPlaying) {
@@ -934,13 +878,19 @@ export default function App() {
   }, []);
 
   const calculateAndPrefetchNextTrack = () => {
-    if (Capacitor.isNativePlatform()) return; // no benefit on native — the Cordova Media plugin doesn't use this hidden <audio> element
+    if (Capacitor.isNativePlatform()) return;
     const queue = currentQueue.length > 0 ? currentQueue : songs;
     if (!queue.length || !currentTrack) return;
 
     let next = null;
     if (isShuffle) {
-      next = queue[Math.floor(Math.random() * queue.length)];
+      if (shuffleBagRef.current && shuffleBagRef.current.length > 0) {
+        const nextId = shuffleBagRef.current[0];
+        next = queue.find(s => s.id === nextId);
+      } else if (queue.length > 1) {
+        const pool = queue.filter(s => s.id !== currentTrack.id);
+        next = pool[0];
+      }
     } else {
       const idx = queue.findIndex(s => s.id === currentTrack.id);
       next = queue[(idx + 1) % queue.length];
@@ -950,8 +900,6 @@ export default function App() {
       nextTrackRef.current = next;
       const rawNextUrl = next.songUrl || next.audioUrl;
       if (rawNextUrl) {
-        // 🆕 Prefetch at the same tier Settings → Streaming Quality will
-        // actually play it at, so we don't warm the cache with the wrong file.
         const nextUrl = appendQualityParam(rawNextUrl, getStreamingQuality());
         if (!prefetchAudioRef.current) prefetchAudioRef.current = new Audio();
         prefetchAudioRef.current.src = nextUrl;
@@ -999,11 +947,23 @@ export default function App() {
     audioRef.current.currentTime = newTime;
   };
 
-  const handleTrackSelection = async (track, customQueue = null) => {
+  const handleTrackSelection = async (track, customQueue = null, resetBag = true) => {
     if (!track) return;
-    setCurrentQueue(customQueue?.length ? customQueue : songs);
+    const newQueue = customQueue?.length ? customQueue : songs;
+    setCurrentQueue(newQueue);
+    
+    if (currentTrack && currentTrack.id !== track.id) {
+      playHistoryRef.current.push(currentTrack);
+      if (playHistoryRef.current.length > 50) playHistoryRef.current.shift();
+    }
+    
     setCurrentTrack(track);
     setIsPlaying(true);
+
+    if (resetBag) {
+      const remainingIds = newQueue.filter(t => t.id !== track.id).map(t => t.id);
+      shuffleBagRef.current = shuffleArray(remainingIds);
+    }
 
     if (user && isOnline) {
       try {
@@ -1019,6 +979,7 @@ export default function App() {
   // 🔑 AUTH
   // ─────────────────────────────────────────────────────────────
   const handleLogin = async () => {
+    setLoading(true);
     try {
       if (Capacitor.isNativePlatform()) {
         const result = await FirebaseAuthentication.signInWithGoogle();
@@ -1031,12 +992,16 @@ export default function App() {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleLogout = async () => {
     setIsPlaying(false);
     setShowProfile(false);
+    setShowNotifications(false);
+    setShowDownloads(false);
     setShowSettings(false);
     setShowUploadSong(false);
     setShowManageAlbums(false);
@@ -1056,7 +1021,11 @@ export default function App() {
         email: user.email,
         createdAt: new Date().toISOString(),
       });
-    } catch (err) { console.error(err); }
+      showToast(`Playlist "${name.trim()}" created!`, 'success', 'fa-folder-plus');
+    } catch (err) { 
+      console.error(err);
+      showToast('Failed to create playlist', 'error', 'fa-circle-xmark');
+    }
   };
 
   const deletePlaylist = async (playlistId) => {
@@ -1065,6 +1034,7 @@ export default function App() {
       for (const m of playlistSongs.filter(m => m.playlistId === playlistId)) {
         await deleteDoc(doc(db, 'playlistSongs', m.id));
       }
+      showToast('Playlist deleted', 'info', 'fa-trash-can');
     } catch (err) { console.error(err); }
   };
 
@@ -1072,12 +1042,16 @@ export default function App() {
     const songId = song.title || song.name;
     if (!songId) return;
     if (playlistSongs.find(m => m.playlistId === playlistId && m.songId === songId)) {
-      return alert('Song already in this playlist!');
+      showToast('Song already in this playlist', 'info', 'fa-circle-info');
+      return;
     }
     try {
       await addDoc(collection(db, 'playlistSongs'), { playlistId, songId });
-      alert('Added to playlist!');
-    } catch (err) { console.error(err); }
+      showToast('Added to playlist!', 'success', 'fa-circle-check');
+    } catch (err) { 
+      console.error(err);
+      showToast('Failed to add to playlist', 'error', 'fa-circle-xmark');
+    }
   };
 
   const removeSongFromPlaylist = async (playlistId, song) => {
@@ -1086,19 +1060,18 @@ export default function App() {
     if (!match) return;
     try {
       await deleteDoc(doc(db, 'playlistSongs', match.id));
+      showToast('Removed from playlist', 'info', 'fa-trash-can');
     } catch (err) { console.error(err); }
   };
 
-  // 🆕 Navigates from the FullPlayerView "Go to Album" action to the real
-  // AlbumDetailsView, closing the player sheet so the album is visible.
   const handleGoToAlbum = (track) => {
     if (!track?.albumId) {
-      alert("This track isn't linked to an album.");
+      showToast("This track isn't linked to an album.", "info", "fa-circle-info");
       return;
     }
     const album = albums.find(a => a.id === track.albumId);
     if (!album) {
-      alert("Album details couldn't be found.");
+      showToast("Album details couldn't be found.", "error", "fa-circle-xmark");
       return;
     }
     setSelectedAlbum(album);
@@ -1107,17 +1080,15 @@ export default function App() {
     setShowFullPlayer(false);
   };
 
-  // 🆕 Navigates from the FullPlayerView "View Artist Profile" action to the
-  // real ArtistDetailsView, closing the player sheet so the artist is visible.
   const handleGoToArtist = (track) => {
     if (!track?.artist) {
-      alert("This track isn't linked to an artist.");
+      showToast("This track isn't linked to an artist.", "info", "fa-circle-info");
       return;
     }
     const credits = splitArtistCredits(track.artist).map(c => c.toLowerCase());
     const artist = artists.find(a => credits.includes((a.name || '').toLowerCase()));
     if (!artist) {
-      alert("Artist profile couldn't be found.");
+      showToast("Artist profile couldn't be found.", "error", "fa-circle-xmark");
       return;
     }
     setSelectedArtist(artist);
@@ -1126,15 +1097,24 @@ export default function App() {
     setShowFullPlayer(false);
   };
 
-  // 🆕 Updates the signed-in user's Firebase Auth profile (display name /
-  // photo). Firebase doesn't re-fire onAuthStateChanged for profile edits,
-  // so we manually refresh the local `user` state afterward.
   const handleUpdateProfile = async (updates) => {
     if (!auth.currentUser) throw new Error("No signed-in user.");
     await updateProfile(auth.currentUser, updates);
     await auth.currentUser.reload();
     setUser({ ...auth.currentUser });
+    showToast("Profile updated successfully!", "success", "fa-circle-check");
   };
+
+  if (loading) {
+    return (
+      <div className="loading-screen-wrapper">
+        <div className="loading-container">
+          <img src={logo} className="loading-logo" alt="Loading..." />
+          <div className="loading-pulse-ring"></div>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -1154,7 +1134,52 @@ export default function App() {
       className={`mobile-container ${increaseContrast ? 'high-contrast-mode' : ''} ${!motionEnabled ? 'disable-animations' : ''}`}
       style={{ '--accent': appTheme }}
     >
-      <Header user={user} onOpenProfile={() => setShowProfile(true)} onViewChange={setCurrentView} />
+      {/* 🍞 In-App UI Feedback Toast Notification */}
+      {toast && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '74px',
+            left: '20px',
+            right: '20px',
+            zIndex: 9999,
+            backgroundColor: toast.type === 'error' ? '#2d1416' : toast.type === 'info' ? '#141d2d' : '#0d2218',
+            border: `1px solid ${toast.type === 'error' ? '#ff4d4d' : toast.type === 'info' ? '#3b82f6' : 'var(--accent)'}`,
+            borderRadius: '16px',
+            padding: '12px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.65)',
+            animation: 'slideDownToast 0.28s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+        >
+          <i
+            className={`fa-solid ${toast.icon || (toast.type === 'error' ? 'fa-circle-xmark' : toast.type === 'info' ? 'fa-circle-info' : 'fa-circle-check')}`}
+            style={{
+              fontSize: '1.15rem',
+              color: toast.type === 'error' ? '#ff4d4d' : toast.type === 'info' ? '#60a5fa' : 'var(--accent)'
+            }}
+          ></i>
+          <span style={{ fontSize: '0.86rem', fontWeight: '600', color: '#ffffff', flex: 1 }}>
+            {toast.message}
+          </span>
+        </div>
+      )}
+
+      <Header 
+        user={user} 
+        onOpenProfile={() => setShowProfile(true)} 
+        onOpenNotifications={() => setShowNotifications(true)} 
+        onOpenDownloads={() => setShowDownloads(true)}
+        hasUnreadNotifications={hasUnreadNotifications}
+        onViewChange={(view) => {
+          setCurrentView(view);
+          setSelectedAlbum(null);
+          setSelectedArtist(null);
+          setSelectedPlaylist(null);
+        }} 
+      />
 
       {!isOnline && (
         <div style={{
@@ -1184,6 +1209,8 @@ export default function App() {
               artists={artists}
               currentTrack={currentTrack}
               isPlaying={isPlaying}
+              isShuffle={isShuffle}
+              onToggleShuffle={toggleShuffle}
               onTogglePlay={togglePlayPause}
               onSelectTrack={handleTrackSelection}
               onBack={() => setSelectedAlbum(null)}
@@ -1195,7 +1222,7 @@ export default function App() {
               currentTrack={currentTrack}
               isPlaying={isPlaying}
               isShuffle={isShuffle}
-              onToggleShuffle={() => setIsShuffle(!isShuffle)}
+              onToggleShuffle={toggleShuffle}
               onTogglePlay={togglePlayPause}
               onSelectTrack={handleTrackSelection}
               onBack={() => setSelectedArtist(null)}
@@ -1312,6 +1339,8 @@ export default function App() {
           playlistSongs={playlistSongs}
           currentTrack={currentTrack}
           isPlaying={isPlaying}
+          isShuffle={isShuffle}
+          onToggleShuffle={toggleShuffle}
           onTogglePlay={togglePlayPause}
           onSelectTrack={handleTrackSelection}
           onCreatePlaylist={createPlaylist}
@@ -1360,7 +1389,7 @@ export default function App() {
           onNext={triggerNextTrackLogic}
           onPrev={triggerPrevTrackLogic}
           onSeekProgress={handleSeekProgress}
-          onToggleShuffle={() => setIsShuffle(!isShuffle)}
+          onToggleShuffle={toggleShuffle}
           onToggleRepeat={() => setIsRepeat(!isRepeat)}
           onSetSleepTimer={setSleepTimeLeft}
           onAddSongToPlaylist={addSongToPlaylist}
@@ -1397,6 +1426,24 @@ export default function App() {
           }}
           onUpdateProfile={handleUpdateProfile}
           onClose={() => setShowProfile(false)}
+        />
+      )}
+
+      {showNotifications && (
+        <NotificationCenter
+          songs={songs}
+          onSelectTrack={handleTrackSelection}
+          onNotificationsRead={() => updateUnreadNotificationStatus(songs)}
+          onClose={() => setShowNotifications(false)}
+        />
+      )}
+
+      {showDownloads && (
+        <DownloadCenterView
+          currentTrack={currentTrack}
+          isPlaying={isPlaying}
+          onSelectTrack={handleTrackSelection}
+          onClose={() => setShowDownloads(false)}
         />
       )}
 

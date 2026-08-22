@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { getSavedArtists } from '../utils/savedArtists';
 
+// 👑 Centralized Admin Registry: Add or remove admin emails here. 
+// This matches your Firestore security rules check.
 const ADMIN_EMAILS = [
   'benolynd@gmail.com',
   'darkrush311@gmail.com',
   '2007kirubhasaravanan@gmail.com',
-  'ganeshjagan003@gmail.com'
+  'ganeshjagan006@gmail.com',
+  'kratozthomas@gmail.com'
 ];
 
 export default function ProfileDrawerView({
@@ -38,7 +41,8 @@ export default function ProfileDrawerView({
 
   if (!user) return null;
 
-  const isHeadAdmin = ADMIN_EMAILS.includes(user.email);
+  // 🚀 Automatically evaluates true if the logged-in user's email is in the admin array
+  const isHeadAdmin = ADMIN_EMAILS.includes((user.email || '').toLowerCase().trim());
   const savedArtistsCount = getSavedArtists(artists).length;
 
   const handleCheckUpdate = () => {
@@ -188,7 +192,7 @@ export default function ProfileDrawerView({
         )}
       </div>
 
-      {/* 👑 Head Admin Control Studio Card */}
+      {/* 👑 Head Admin Control Studio Card (Automated by ADMIN_EMAILS list) */}
       {isHeadAdmin && (
         <div style={{ marginBottom: '18px', backgroundColor: 'rgba(29, 185, 84, 0.04)', padding: '16px 14px', borderRadius: '16px', border: '1px solid rgba(29, 185, 84, 0.18)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', paddingLeft: '4px' }}>

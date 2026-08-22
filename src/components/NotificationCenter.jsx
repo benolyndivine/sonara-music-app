@@ -1,242 +1,308 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
+import React, { useState, useEffect } from 'react';
 
-/**
- * NotificationCenter
- * ------------------
- * Renders a Spotify-style "now playing" notification bar that drops from the
- * top of the screen. On the web/PWA it also registers the Web Media Session
- * API so the browser/OS lock-screen and notification shade show album art +
- * controls. On native (Capacitor/Android), it does NOT touch
- * navigator.mediaSession at all — App.jsx already registers a real native
- * MediaSessionCompat session via @capgo/capacitor-media-session, which is
- * what actually receives Bluetooth AVRCP (play/pause/next/previous) button
- * events. The Android WebView itself also implements the Web Media Session
- * API, so if this component registered its own handlers unconditionally, it
- * would create a second, competing OS media session that keeps re-asserting
- * itself (it used to re-register every ~1s via the trackProgress dependency)
- * and steals Bluetooth/lock-screen focus away from the real native session —
- * which is why the hardware headset buttons weren't working.
- *
- * Props
- * -----
- * currentTrack  – track object  (required)
- * isPlaying     – boolean
- * trackProgress – number (seconds)
- * trackDuration – number (seconds)
- * onTogglePlay  – () => void
- * onNext        – () => void
- * onPrev        – () => void
- * onSeekProgress– (seconds: number) => void
- * onExpand      – () => void  (opens FullPlayerView)
- */
-export default function NotificationCenter({
-  currentTrack,
-  isPlaying,
-  trackProgress,
-  trackDuration,
-  onTogglePlay,
-  onNext,
-  onPrev,
-  onSeekProgress,
-  onExpand,
-}) {
-  const [visible, setVisible] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragDelta, setDragDelta] = useState(0);
-  const startYRef = useRef(null);
-  const mediaSessionReady = useRef(false);
+const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 
-  /* ── Show / hide on track change ── */
-  useEffect(() => {
-    if (currentTrack) {
-      setVisible(true);
-    }
-  }, [currentTrack]);
-
-  /* ── Web Media Session API (web/PWA only — see note above) ── */
-  useEffect(() => {
-    if (Capacitor.isNativePlatform() || !('mediaSession' in navigator) || !currentTrack) return;
-
-    const artwork = currentTrack.cover || currentTrack.image || currentTrack.imageUrl || '';
-    const title   = currentTrack.title  || currentTrack.name  || 'Unknown';
-    const artist  = currentTrack.artist || '';
-
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title,
-      artist,
-      album: 'Sonara',
-      artwork: artwork
-        ? [
-            { src: artwork, sizes: '96x96',   type: 'image/png' },
-            { src: artwork, sizes: '128x128',  type: 'image/png' },
-            { src: artwork, sizes: '256x256',  type: 'image/png' },
-            { src: artwork, sizes: '512x512',  type: 'image/png' },
-          ]
-        : [],
-    });
-
-    mediaSessionReady.current = true;
-  }, [currentTrack]);
-
-  /* ── Sync playback state to Media Session (web/PWA only) ── */
-  useEffect(() => {
-    if (Capacitor.isNativePlatform() || !('mediaSession' in navigator) || !mediaSessionReady.current) return;
-    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-  }, [isPlaying]);
-
-  /* ── Sync position to Media Session (web/PWA only, every ~1 s via trackProgress) ── */
-  useEffect(() => {
-    if (Capacitor.isNativePlatform() || !('mediaSession' in navigator) || !mediaSessionReady.current) return;
-    if (!trackDuration || isNaN(trackDuration)) return;
+export default function NotificationCenter({ onClose, onSelectTrack, songs = [], onNotificationsRead }) {
+  const [clearedIds, setClearedIds] = useState(() => {
     try {
-      navigator.mediaSession.setPositionState({
-        duration:     trackDuration,
-        playbackRate: 1,
-        position:     Math.min(trackProgress, trackDuration),
-      });
-    } catch (_) { /* older browsers */ }
-  }, [trackProgress, trackDuration]);
-
-  /* ── Wire OS media buttons → our handlers (web/PWA only — on native,
-     App.jsx's @capgo/capacitor-media-session handlers own this) ── */
-  useEffect(() => {
-    if (Capacitor.isNativePlatform() || !('mediaSession' in navigator)) return;
-
-    const set = (action, handler) => {
-      try { navigator.mediaSession.setActionHandler(action, handler); } catch (_) {}
-    };
-
-    set('play',          () => onTogglePlay());
-    set('pause',         () => onTogglePlay());
-    set('nexttrack',     () => onNext());
-    set('previoustrack', () => onPrev());
-    set('seekto',        (d) => d?.seekTime != null && onSeekProgress(d.seekTime));
-    set('seekbackward',  (d) => onSeekProgress(Math.max(0, trackProgress - (d?.seekOffset ?? 10))));
-    set('seekforward',   (d) => onSeekProgress(Math.min(trackDuration, trackProgress + (d?.seekOffset ?? 10))));
-
-    return () => {
-      ['play','pause','nexttrack','previoustrack','seekto','seekbackward','seekforward']
-        .forEach(a => { try { navigator.mediaSession.setActionHandler(a, null); } catch (_) {} });
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackProgress, trackDuration, onTogglePlay, onNext, onPrev, onSeekProgress]);
-
-  /* ── Swipe-up to dismiss ── */
-  const handlePointerDown = (e) => {
-    startYRef.current = e.touches?.[0]?.clientY ?? e.clientY;
-    setIsDragging(true);
-    setDragDelta(0);
-  };
-
-  const handlePointerMove = (e) => {
-    if (!isDragging || startYRef.current === null) return;
-    const y = e.touches?.[0]?.clientY ?? e.clientY;
-    const delta = y - startYRef.current;
-    if (delta < 0) setDragDelta(delta); // only upward
-  };
-
-  const handlePointerUp = () => {
-    setIsDragging(false);
-    if (dragDelta < -60) {
-      setVisible(false); // swiped up enough → dismiss
+      return JSON.parse(localStorage.getItem('sonara_cleared_notifications') || '[]');
+    } catch {
+      return [];
     }
-    setDragDelta(0);
-    startYRef.current = null;
+  });
+
+  // 🕒 Live clock tick every 30 seconds to force automatic relative timestamp updates
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const liveTimer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 30000);
+    return () => clearInterval(liveTimer);
+  }, []);
+
+  // Helper to extract timestamp in milliseconds
+  const getSongTimestamp = (song) => {
+    if (song.createdAt?.seconds) return song.createdAt.seconds * 1000;
+    if (song.createdAt?.toMillis) return song.createdAt.toMillis();
+    if (song.uploadedAt) return new Date(song.uploadedAt).getTime();
+    if (song.createdAt) return new Date(song.createdAt).getTime();
+    return 0;
   };
 
-  /* ── Helpers ── */
-  const fmt = (s) => {
-    if (isNaN(s) || s === undefined) return '0:00';
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec < 10 ? '0' : ''}${sec}`;
+  // Filter songs added within 2 days that have not been permanently cleared
+  const recentSongs = songs
+    .filter((song) => {
+      if (clearedIds.includes(song.id)) return false;
+      const time = getSongTimestamp(song);
+      return time > 0 && (currentTime - time) <= TWO_DAYS_MS;
+    })
+    .sort((a, b) => getSongTimestamp(b) - getSongTimestamp(a));
+
+  // Automatically mark all current notifications as read upon opening
+  useEffect(() => {
+    try {
+      const readIds = JSON.parse(localStorage.getItem('sonara_read_notifications') || '[]');
+      const currentSongIds = songs.map((s) => s.id);
+      const updated = Array.from(new Set([...readIds, ...currentSongIds]));
+      localStorage.setItem('sonara_read_notifications', JSON.stringify(updated));
+      onNotificationsRead?.();
+    } catch (err) {
+      console.error('Failed to mark notifications as read:', err);
+    }
+  }, [songs, onNotificationsRead]);
+
+  // Permanently clears all current notifications across app sessions
+  const clearAllNotifications = () => {
+    try {
+      const currentSongIds = songs.map((s) => s.id);
+      const updatedCleared = Array.from(new Set([...clearedIds, ...currentSongIds]));
+      setClearedIds(updatedCleared);
+      localStorage.setItem('sonara_cleared_notifications', JSON.stringify(updatedCleared));
+
+      const readIds = JSON.parse(localStorage.getItem('sonara_read_notifications') || '[]');
+      const updatedRead = Array.from(new Set([...readIds, ...currentSongIds]));
+      localStorage.setItem('sonara_read_notifications', JSON.stringify(updatedRead));
+
+      onNotificationsRead?.();
+    } catch (err) {
+      console.error('Failed to clear notifications:', err);
+    }
   };
 
-  const pct = trackDuration > 0 ? (trackProgress / trackDuration) * 100 : 0;
+  // ⏱️ Live Relative Time Formatter (< 1m: just now, < 60m: Xm ago, < 24h: Xh ago, >= 24h: Xd ago)
+  const formatSongTime = (song) => {
+    const time = getSongTimestamp(song);
+    if (!time) return 'Recently Added';
+    const diffMs = currentTime - time;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
 
-  if (!currentTrack || !visible) return null;
-
-  const imgSrc = currentTrack.cover || currentTrack.image || currentTrack.imageUrl;
-  const title  = currentTrack.title || currentTrack.name;
-
-  const translateY = Math.max(-120, dragDelta);
-  const opacity    = 1 + translateY / 120;
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  };
 
   return (
     <div
-      className="nc-wrapper"
-      style={{ transform: `translateY(${translateY}px)`, opacity }}
-      onTouchStart={handlePointerDown}
-      onTouchMove={handlePointerMove}
-      onTouchEnd={handlePointerUp}
-      onMouseDown={handlePointerDown}
-      onMouseMove={isDragging ? handlePointerMove : undefined}
-      onMouseUp={handlePointerUp}
+      className="nc-hide-scrollbar"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: '#05070c',
+        zIndex: 650,
+        padding: '24px 20px 48px',
+        display: 'flex',
+        flexDirection: 'column',
+        boxSizing: 'border-box',
+        overflowY: 'auto',
+        animation: 'slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)'
+      }}
     >
-      {/* Drag pill */}
-      <div className="nc-pill" />
+      <style>{notificationStyles}</style>
 
-      {/* Main card — click anywhere non-button to open full player */}
-      <div className="nc-card" onClick={onExpand}>
+      {/* Header Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <button
+          onClick={onClose}
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: '0.95rem'
+          }}
+          aria-label="Back"
+        >
+          <i className="fa-solid fa-chevron-left"></i>
+        </button>
 
-        {/* Left: art + info */}
-        <div className="nc-track-info">
-          <div className="nc-art-wrap">
-            <img src={imgSrc} alt={title} className="nc-art" />
-            {isPlaying && (
-              <div className="nc-playing-bars">
-                <span /><span /><span /><span />
-              </div>
-            )}
-          </div>
-          <div className="nc-meta">
-            <p className="nc-title">{title}</p>
-            <p className="nc-artist">{currentTrack.artist}</p>
-          </div>
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#ffffff' }}>Notifications</h2>
+          <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+            Last 48 Hours
+          </span>
         </div>
 
-        {/* Right: controls */}
-        <div className="nc-controls" onClick={e => e.stopPropagation()}>
-          <button className="nc-btn" onClick={onPrev} title="Previous">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
-            </svg>
+        {recentSongs.length > 0 ? (
+          <button
+            onClick={clearAllNotifications}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--accent)',
+              fontSize: '0.78rem',
+              fontWeight: '700',
+              cursor: 'pointer',
+              padding: '4px'
+            }}
+          >
+            Clear all
           </button>
-
-          <button className="nc-btn nc-play-btn" onClick={onTogglePlay} title={isPlaying ? 'Pause' : 'Play'}>
-            {isPlaying
-              ? <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-              : <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{marginLeft:'2px'}}><path d="M8 5v14l11-7z"/></svg>
-            }
-          </button>
-
-          <button className="nc-btn" onClick={onNext} title="Next">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 18l8.5-6L6 6v12zm2-8.14 5.09 2.14L8 14.14V9.86zM16 6h2v12h-2z"/>
-            </svg>
-          </button>
-        </div>
+        ) : (
+          <div style={{ width: '40px' }}></div>
+        )}
       </div>
 
-      {/* Progress bar */}
-      <div className="nc-progress-track" onClick={e => e.stopPropagation()}>
-        <input
-          type="range"
-          min="0"
-          max={trackDuration || 100}
-          value={trackProgress}
-          onChange={e => onSeekProgress(parseFloat(e.target.value))}
-          className="nc-seeker"
-          style={{
-            background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, rgba(255,255,255,0.18) ${pct}%, rgba(255,255,255,0.18) 100%)`
-          }}
-        />
-        <div className="nc-times">
-          <span>{fmt(trackProgress)}</span>
-          <span>{fmt(trackDuration)}</span>
+      {/* Subheader summary */}
+      {recentSongs.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', padding: '0 4px' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+            {recentSongs.length} New Song{recentSongs.length === 1 ? '' : 's'} Added Recently
+          </span>
         </div>
+      )}
+
+      {/* Filtered Song Releases List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {recentSongs.length > 0 ? (
+          recentSongs.map((song) => {
+            const songImg = song.cover || song.image || song.imageUrl || song.coverUrl;
+            const songTitle = song.title || song.name || 'Untitled Track';
+
+            return (
+              <div
+                key={song.id}
+                onClick={() => {
+                  onSelectTrack?.(song, songs);
+                  onClose?.();
+                }}
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: '16px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  gap: '14px',
+                  alignItems: 'center',
+                  position: 'relative',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {/* Song Cover Thumbnail */}
+                <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0 }}>
+                  {songImg ? (
+                    <img
+                      src={songImg}
+                      alt={songTitle}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '10px',
+                        objectFit: 'cover',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '10px',
+                        backgroundColor: 'rgba(29, 185, 84, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <i className="fa-solid fa-music" style={{ color: 'var(--accent)', fontSize: '1.2rem' }}></i>
+                    </div>
+                  )}
+                </div>
+
+                {/* Song Details */}
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                    <h4
+                      style={{
+                        margin: 0,
+                        fontSize: '0.92rem',
+                        fontWeight: '700',
+                        color: '#ffffff',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
+                      {songTitle}
+                    </h4>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '500', marginLeft: '8px', flexShrink: 0 }}>
+                      {formatSongTime(song)}
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: '0.8rem',
+                      color: 'rgba(255, 255, 255, 0.65)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {song.artist || 'Unknown Artist'} • <span style={{ color: 'var(--accent)' }}>Tap to play</span>
+                  </p>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '80px 20px',
+              textAlign: 'center'
+            }}
+          >
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px'
+              }}
+            >
+              <i className="fa-regular fa-bell" style={{ fontSize: '1.8rem', color: 'var(--text-muted)' }}></i>
+            </div>
+            <h3 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', color: '#ffffff', fontWeight: '700' }}>No Recent Releases</h3>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: '240px' }}>
+              No new songs have been added in the past 2 days.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+const notificationStyles = `
+  /* 🛡️ Hide Scrollbar Globally inside Notification Center */
+  .nc-hide-scrollbar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  .nc-hide-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+`;

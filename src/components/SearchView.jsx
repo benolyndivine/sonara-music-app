@@ -1,36 +1,43 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { downloadTrackToDevice, isTrackCachedOffline } from '../utils/offlineStorage';
 
-export default function SearchView({ songs, playlists, albums, artists, currentTrack, isPlaying, onSelectTrack, onSelectAlbum, onSelectArtist, onAddSongToPlaylist }) {
+export default function SearchView({ songs, playlists, albums, artists, currentTrack, isPlaying, onSelectTrack, onSelectAlbum, onSelectArtist, onAddSongToPlaylist, autoFocus = false }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [downloadedMap, setDownloadedMap] = useState({});
+  const [toastMessage, setToastMessage] = useState(null);
   const searchInputRef = useRef(null);
 
-  // 🚀 Multi-stage mobile WebView auto-focus handler
+  const displayToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  // Only auto-focus and open the keyboard if autoFocus is true (Header Search)
   useEffect(() => {
-    const triggerFocus = () => {
+    if (!autoFocus) return;
+
+    const focusInput = () => {
       if (searchInputRef.current) {
         searchInputRef.current.focus({ preventScroll: false });
+        const len = searchInputRef.current.value.length;
+        searchInputRef.current.setSelectionRange(len, len);
       }
     };
 
-    // Immediate attempt
-    triggerFocus();
-
-    // Frame-synced attempt
-    const frameId = requestAnimationFrame(triggerFocus);
-
-    // Timeout fallbacks to catch WebView animation and touch release cycles
-    const timer1 = setTimeout(triggerFocus, 80);
-    const timer2 = setTimeout(triggerFocus, 250);
+    focusInput();
+    const frameId = requestAnimationFrame(focusInput);
+    const timer1 = setTimeout(focusInput, 50);
+    const timer2 = setTimeout(focusInput, 150);
+    const timer3 = setTimeout(focusInput, 300);
 
     return () => {
       cancelAnimationFrame(frameId);
       clearTimeout(timer1);
       clearTimeout(timer2);
+      clearTimeout(timer3);
     };
-  }, []);
+  }, [autoFocus]);
 
   useEffect(() => {
     const audit = {};
@@ -44,15 +51,14 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
       setDownloadedMap(prev => ({ ...prev, [song.id]: 'loading' }));
       await downloadTrackToDevice(song);
       setDownloadedMap(prev => ({ ...prev, [song.id]: true }));
-      alert(`"${song.title || song.name}" is now available offline!`);
+      displayToast(`"${song.title || song.name}" saved offline!`);
     } catch {
       setDownloadedMap(prev => ({ ...prev, [song.id]: false }));
-      alert("Download failed. Check your network connection.");
+      displayToast("Download failed. Check connection.");
     }
     setActiveDropdown(null);
   };
 
-  // 🚀 Native Song Share Handler
   const handleShareSong = async (e, song) => {
     e.stopPropagation();
     const songTitle = song.title || song.name;
@@ -66,12 +72,11 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
       if (navigator.share) {
         await navigator.share(shareData);
       } else {
-        // Web fallback clipboard hook
         await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-        alert("Song link copied to clipboard!");
+        displayToast("Song link copied to clipboard!");
       }
     } catch (err) {
-      console.log("Share sheet dismissed or failed:", err);
+      console.log("Share sheet dismissed:", err);
     }
     setActiveDropdown(null);
   };
@@ -94,7 +99,19 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
   }) : [];
 
   return (
-    <div className="mobile-content">
+    <div className="mobile-content" style={{ position: 'relative' }}>
+      {toastMessage && (
+        <div style={{
+          position: 'fixed', top: '24px', left: '20px', right: '20px', zIndex: 9999,
+          backgroundColor: '#0d2218', border: '1px solid var(--accent)', borderRadius: '14px',
+          padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
+        }}>
+          <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+        </div>
+      )}
+
       <div className="view-header">
         <h2 className="view-title">Search</h2>
       </div>
@@ -107,7 +124,6 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="search-input-field"
-          autoFocus
           style={{
             width: '100%', height: '48px', backgroundColor: 'rgba(255, 255, 255, 0.06)',
             border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px',

@@ -4,8 +4,13 @@ import { downloadTrackToDevice, isTrackCachedOffline } from '../utils/offlineSto
 export default function AllSongsView({ songs, currentTrack, isPlaying, onSelectTrack, onBack }) {
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [downloadedMap, setDownloadedMap] = useState({});
+  const [toastMessage, setToastMessage] = useState(null);
 
-  // Audit active download registers across popular tracks on mount/update
+  const displayToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
   useEffect(() => {
     const audit = {};
     songs.forEach(s => { audit[s.id] = isTrackCachedOffline(s.id); });
@@ -18,10 +23,10 @@ export default function AllSongsView({ songs, currentTrack, isPlaying, onSelectT
       setDownloadedMap(prev => ({ ...prev, [song.id]: 'loading' }));
       await downloadTrackToDevice(song);
       setDownloadedMap(prev => ({ ...prev, [song.id]: true }));
-      alert(`"${song.title || song.name}" is now available offline!`);
+      displayToast(`"${song.title || song.name}" saved offline!`);
     } catch {
       setDownloadedMap(prev => ({ ...prev, [song.id]: false }));
-      alert("Download failed. Check your network connection.");
+      displayToast("Download failed. Check connection.");
     }
     setActiveDropdown(null);
   };
@@ -40,7 +45,7 @@ export default function AllSongsView({ songs, currentTrack, isPlaying, onSelectT
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-        alert("Song link copied to clipboard!");
+        displayToast("Song link copied to clipboard!");
       }
     } catch (err) {
       console.log("Share sheet dismissed:", err);
@@ -49,7 +54,19 @@ export default function AllSongsView({ songs, currentTrack, isPlaying, onSelectT
   };
 
   return (
-    <div className="mobile-content">
+    <div className="mobile-content" style={{ position: 'relative' }}>
+      {toastMessage && (
+        <div style={{
+          position: 'fixed', top: '24px', left: '20px', right: '20px', zIndex: 9999,
+          backgroundColor: '#0d2218', border: '1px solid var(--accent)', borderRadius: '14px',
+          padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
+        }}>
+          <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+        </div>
+      )}
+
       <div className="view-header">
         <button className="back-arrow-btn" onClick={onBack} title="Back to Home">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -98,7 +115,6 @@ export default function AllSongsView({ songs, currentTrack, isPlaying, onSelectT
                 
                 {activeDropdown === song.id && (
                   <div className="premium-dropdown-menu" style={{ right: '10px', top: '30px', position: 'absolute', zIndex: 500 }}>
-                    {/* 🛠️ NEW: HIGH CONTRAST OFFLINE TRACK DOWNLOAD BUTTON */}
                     <button 
                       onClick={(e) => handleDownloadClick(e, song)} 
                       className="dropdown-playlist-option" 

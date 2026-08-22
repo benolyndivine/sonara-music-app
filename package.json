@@ -23,7 +23,7 @@
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/share": "^8.0.1",
     "@capacitor/status-bar": "^8.0.3",
-    "@capgo/capacitor-media-session": "^8.0.28",
+    "@capgo/capacitor-media-session": "^8.0.30",
     "@capgo/capacitor-native-audio": "^8.4.14",
     "cordova-plugin-media": "^7.0.0",
     "firebase": "^12.15.0",

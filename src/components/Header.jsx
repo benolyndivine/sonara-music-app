@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import logo from '../assets/logo3.png';
 
-export default function Header({ user, onOpenProfile, onViewChange }) {
+export default function Header({ user, onOpenProfile, onViewChange, onOpenNotifications, onOpenDownloads, hasUnreadNotifications = false }) {
   const [imageError, setImageError] = useState(false);
 
   const userInitial = user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U';
@@ -21,11 +21,11 @@ export default function Header({ user, onOpenProfile, onViewChange }) {
       </div>
       
       <div className="header-actions">
-        {/* Search trigger navbar button */}
+        {/* Search trigger button in header with autoFocus = true */}
         <button 
           className="header-search-btn" 
           title="Search Music"
-          onClick={() => onViewChange && onViewChange('search')}
+          onClick={() => onViewChange && onViewChange('search', true)}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
@@ -33,10 +33,47 @@ export default function Header({ user, onOpenProfile, onViewChange }) {
           </svg>
         </button>
 
+        {/* 📥 Download Center Header Trigger */}
+        <button 
+          className="header-search-btn" 
+          title="Download Center"
+          onClick={onOpenDownloads}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+        </button>
+
+        {/* 🔔 Notification trigger button */}
+        <button 
+          className="header-search-btn" 
+          title="Notifications"
+          onClick={onOpenNotifications}
+          style={{ position: 'relative' }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          {hasUnreadNotifications && (
+            <span style={{
+              position: 'absolute',
+              top: '4px',
+              right: '4px',
+              width: '8px',
+              height: '8px',
+              backgroundColor: 'var(--accent)',
+              borderRadius: '50%'
+            }}></span>
+          )}
+        </button>
+
         {/* Profile Avatar System */}
         <div className="profile-badge-wrapper">
           <button 
-            onClick={onOpenProfile} /* 🔌 Redirected handler task target link */
+            onClick={onOpenProfile}
             title="View Profile Details"
             className="header-profile-btn"
           >

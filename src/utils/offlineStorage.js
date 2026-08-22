@@ -2,6 +2,27 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import { getDownloadQuality, getStreamingQuality, appendQualityParam } from './audioQuality';
 
+// Global listeners for live download progress updates
+const progressListeners = new Set();
+
+export function subscribeToDownloadProgress(listener) {
+  progressListeners.add(listener);
+  return () => progressListeners.delete(listener);
+}
+
+function notifyProgress(progressMap) {
+  progressListeners.forEach(listener => {
+    try { listener(progressMap); } catch (e) { console.error(e); }
+  });
+}
+
+// Active in-flight downloads: { [songId]: { progress: number, status: 'downloading' | 'completed' | 'error', title: string, artist: string, cover: string } }
+let activeDownloads = {};
+
+export function getActiveDownloads() {
+  return { ...activeDownloads };
+}
+
 /**
  * Checks and requests runtime storage/audio permissions on native devices
  */
@@ -22,7 +43,7 @@ export async function requestStoragePermission() {
 }
 
 /**
- * Downloads a remote track file source stream to localized app directories on hybrid hardware
+ * Downloads a remote track file source stream to localized app directories on hybrid hardware with progress tracking
  */
 export async function downloadTrackToDevice(song) {
   const rawAudioUrl = song.songUrl || song.audioUrl;
@@ -37,51 +58,128 @@ export async function downloadTrackToDevice(song) {
     }
   }
 
-  // 🆕 Request the tier picked in Settings → Download Quality. Backends that
-  // support per-request transcoding profiles honor `quality` immediately;
-  // this is also the value we store alongside the file below so the
-  // Downloaded tab / storage stats can show what quality is on disk.
   const downloadQuality = getDownloadQuality();
   const audioUrl = appendQualityParam(rawAudioUrl, downloadQuality);
 
-  // 🛠️ FIX: Save the song's own display metadata alongside the download.
-  // Previously the Library's Downloaded tab only ever showed
-  // songs.filter(isTrackCachedOffline) — but `songs` comes from a Firestore
-  // onSnapshot listener, which returns nothing on a fully offline cold
-  // start (no cached data to read yet). Storing metadata here means the
-  // Downloaded tab can render straight from localStorage with zero
-  // dependency on Firestore ever having loaded.
-  const meta = {
+  // Initialize progress tracking
+  activeDownloads[song.id] = {
     id: song.id,
     title: songTitle,
     artist: song.artist || 'Unknown Artist',
     cover: song.cover || song.image || song.imageUrl || null,
-    albumId: song.albumId || null,
-    quality: downloadQuality,
+    progress: 5,
+    status: 'downloading'
   };
-  localStorage.setItem(`offline_meta_${song.id}`, JSON.stringify(meta));
+  notifyProgress(activeDownloads);
 
-  // For standard desktop web browsers, fallback seamlessly to native cache tracking descriptors
+  const saveMeta = (sizeBytes = 0) => {
+    const meta = {
+      id: song.id,
+      title: songTitle,
+      artist: song.artist || 'Unknown Artist',
+      cover: song.cover || song.image || song.imageUrl || null,
+      albumId: song.albumId || null,
+      quality: downloadQuality,
+      size: sizeBytes,
+      downloadedAt: new Date().toISOString()
+    };
+    localStorage.setItem(`offline_meta_${song.id}`, JSON.stringify(meta));
+  };
+
+  // Web / PWA browser environment: simulated fetch with readable stream
   if (!Capacitor.isNativePlatform()) {
-    localStorage.setItem(`offline_track_${song.id}`, audioUrl);
-    return audioUrl;
+    try {
+      const response = await fetch(audioUrl);
+      const contentLength = response.headers.get('content-length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      let loaded = 0;
+
+      if (response.body && total > 0) {
+        const reader = response.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          loaded += value.length;
+          const pct = Math.min(95, Math.round((loaded / total) * 100));
+          if (activeDownloads[song.id]) {
+            activeDownloads[song.id].progress = pct;
+            notifyProgress(activeDownloads);
+          }
+        }
+      }
+
+      saveMeta(total || 4500000);
+      localStorage.setItem(`offline_track_${song.id}`, audioUrl);
+
+      if (activeDownloads[song.id]) {
+        activeDownloads[song.id].progress = 100;
+        activeDownloads[song.id].status = 'completed';
+        notifyProgress(activeDownloads);
+        setTimeout(() => {
+          delete activeDownloads[song.id];
+          notifyProgress(activeDownloads);
+        }, 3000);
+      }
+      return audioUrl;
+    } catch (error) {
+      if (activeDownloads[song.id]) {
+        activeDownloads[song.id].status = 'error';
+        notifyProgress(activeDownloads);
+      }
+      localStorage.removeItem(`offline_meta_${song.id}`);
+      throw error;
+    }
   }
 
+  // Native Capacitor filesystem execution
   try {
     const filename = `sonara_track_${song.id}.mp3`;
 
-    // Initialize cross-origin background fetch execution
+    let progressInterval = setInterval(() => {
+      if (activeDownloads[song.id] && activeDownloads[song.id].progress < 90) {
+        activeDownloads[song.id].progress += 15;
+        notifyProgress(activeDownloads);
+      }
+    }, 300);
+
     const downloadResult = await Filesystem.downloadFile({
       url: audioUrl,
       path: filename,
-      directory: Directory.Data
+      directory: Directory.Data,
+      progress: true
     });
 
-    // Save mapping identifier key locally to allow instant zero-network lookups
+    clearInterval(progressInterval);
+
+    let statSize = 0;
+    try {
+      const stat = await Filesystem.stat({
+        path: filename,
+        directory: Directory.Data
+      });
+      statSize = stat.size || 0;
+    } catch (_) {}
+
+    saveMeta(statSize);
     localStorage.setItem(`offline_track_${song.id}`, downloadResult.path);
+
+    if (activeDownloads[song.id]) {
+      activeDownloads[song.id].progress = 100;
+      activeDownloads[song.id].status = 'completed';
+      notifyProgress(activeDownloads);
+      setTimeout(() => {
+        delete activeDownloads[song.id];
+        notifyProgress(activeDownloads);
+      }, 3000);
+    }
+
     return downloadResult.path;
   } catch (error) {
     console.error(`Offline file caching failed for track: ${songTitle}`, error);
+    if (activeDownloads[song.id]) {
+      activeDownloads[song.id].status = 'error';
+      notifyProgress(activeDownloads);
+    }
     localStorage.removeItem(`offline_meta_${song.id}`);
     throw error;
   }
@@ -95,10 +193,7 @@ export function isTrackCachedOffline(songId) {
 }
 
 /**
- * Rebuilds the list of downloaded songs entirely from localStorage — does
- * NOT depend on the live `songs` array from Firestore. This is what makes
- * the Library's Downloaded tab work on a fully offline cold start, before
- * any onSnapshot data has ever arrived.
+ * Rebuilds the list of downloaded songs entirely from localStorage
  */
 export function getDownloadedSongsList() {
   const results = [];
@@ -117,12 +212,45 @@ export function getDownloadedSongsList() {
       artist: meta.artist || 'Unknown Artist',
       cover: meta.cover || null,
       albumId: meta.albumId || null,
-      // Keep songUrl populated so anything expecting it still works —
-      // getPlaybackSource() will still prefer the local file either way.
+      size: meta.size || 0,
+      downloadedAt: meta.downloadedAt || null,
       songUrl: localPath,
     });
   }
   return results;
+}
+
+/**
+ * Calculates total storage used by downloaded music tracks
+ */
+export function getTotalStorageUsage() {
+  let totalBytes = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith('offline_meta_')) continue;
+    try {
+      const meta = JSON.parse(localStorage.getItem(key));
+      totalBytes += (meta.size || 4500000); // 4.5MB fallback estimate
+    } catch (_) {}
+  }
+  return totalBytes;
+}
+
+/**
+ * Deletes a single downloaded song from device filesystem and storage metadata
+ */
+export async function deleteDownloadedSong(songId) {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const filename = `sonara_track_${songId}.mp3`;
+      await Filesystem.deleteFile({
+        path: filename,
+        directory: Directory.Data
+      });
+    } catch (_) {}
+  }
+  localStorage.removeItem(`offline_track_${songId}`);
+  localStorage.removeItem(`offline_meta_${songId}`);
 }
 
 /**
@@ -131,21 +259,8 @@ export function getDownloadedSongsList() {
 export function getPlaybackSource(song) {
   if (!song) return null;
   const localPath = localStorage.getItem(`offline_track_${song.id}`);
-  
-  if (localPath) {
-    // 🛠️ FIX: Native audio playback goes through the Cordova Media plugin
-    // (Media.create), which talks directly to the OS media player and needs
-    // a real filesystem path. Capacitor.convertFileSrc() produces a
-    // WebView-only resource URL (capacitor://.../_capacitor_file_/...) meant
-    // for <img>/<video> tags — Media.create() can't resolve that to a file,
-    // so it silently failed to play anything that had been downloaded.
-    // The raw path from Filesystem.downloadFile() is exactly what Media.create() expects.
-    return localPath;
-  }
+  if (localPath) return localPath;
 
-  // 🆕 No local copy — streaming live over the network, so apply the tier
-  // picked in Settings → Streaming Quality. Same `quality` query-param
-  // convention as downloads (see downloadTrackToDevice above).
   const remoteUrl = song.songUrl || song.audioUrl;
   if (!remoteUrl) return null;
   return appendQualityParam(remoteUrl, getStreamingQuality());
@@ -155,17 +270,6 @@ export function getPlaybackSource(song) {
  * Wipes out all stored local tracking registry flags and deletes downloaded native files
  */
 export async function clearAllLocalCache() {
-  // 🛠️ FIX: This used to take an external `songsList` (the live Firestore
-  // `songs` array) and loop over IT to figure out which native files to
-  // delete. That's the wrong source of truth — if `songsList` was empty or
-  // incomplete (e.g. opened while offline, before Firestore had loaded —
-  // see the Downloaded-tab fix above), step 2 below still unconditionally
-  // wiped every `offline_track_*` tracking key, so the app "forgot" those
-  // downloads and they vanished from the Downloaded tab, while the actual
-  // files silently stayed orphaned on disk since step 1 never found them.
-  // Deriving the file list directly from localStorage (the actual record
-  // of what's downloaded) keeps deletion and bookkeeping consistent no
-  // matter what's loaded from Firestore at the time.
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -174,7 +278,6 @@ export async function clearAllLocalCache() {
     }
   }
 
-  // 1. Loop and wipe physical device binary files if running natively
   if (Capacitor.isNativePlatform()) {
     for (const key of keysToRemove) {
       const storedPath = localStorage.getItem(key);
@@ -185,13 +288,10 @@ export async function clearAllLocalCache() {
           path: filename,
           directory: Directory.Data
         });
-      } catch (e) {
-        // Safe to skip silently if the file wasn't downloaded or found inside local scopes
-      }
+      } catch (e) {}
     }
   }
 
-  // 2. Clear out all offline tracker + metadata descriptors from localStorage
   keysToRemove.forEach((key) => {
     const songId = key.replace('offline_track_', '');
     localStorage.removeItem(key);

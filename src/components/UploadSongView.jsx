@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { uploadToCloudinary } from '../services/cloudinaryService';
 
@@ -145,10 +145,13 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
       setStep('metadata');
       setStatus({ type: 'loading', message: 'Saving track metadata to Firebase…' });
 
+      const docId = title.trim(); // 🛠️ Uses the exact song title as the explicit Document ID
+
       // 2. Comprehensive schema to support every view in Sonara
       const songData = {
-        title: title.trim(),
-        name: title.trim(),
+        id: docId,
+        title: docId,
+        name: docId,
         artist: artist.trim(),
         cover: coverUrl,
         coverUrl: coverUrl,
@@ -157,15 +160,16 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
         songUrl: songUrl,
         audioUrl: songUrl,
         uploadedBy: user?.email || 'admin',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         uploadedAt: new Date().toISOString(),
       };
 
-      const docRef = await addDoc(collection(db, targetCollection), songData);
+      // 🚀 Explicitly save using setDoc with docId as the Firestore Document ID (No Auto-ID)
+      await setDoc(doc(db, targetCollection, docId), songData);
 
       setStep(null);
       setStatus({ type: 'success', message: `“${songData.title}” was uploaded successfully!` });
-      onSongUploaded?.({ id: docRef.id, ...songData });
+      onSongUploaded?.(songData);
 
       setTitle('');
       setArtist('');
@@ -244,7 +248,7 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
               <label style={labelStyle}>
                 <i className="fa-solid fa-heading" style={iconLabelStyle}></i>
-                Song Title <span style={{ color: 'var(--accent)' }}>*</span>
+                Song Title (Document ID) <span style={{ color: 'var(--accent)' }}>*</span>
               </label>
               <span style={counterStyle(title.length, TITLE_MAX)}>{title.length}/{TITLE_MAX}</span>
             </div>

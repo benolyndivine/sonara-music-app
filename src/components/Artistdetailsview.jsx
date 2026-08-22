@@ -3,18 +3,16 @@ import { downloadTrackToDevice, isTrackCachedOffline } from '../utils/offlineSto
 import { songMatchesArtist } from '../utils/artistMatch';
 import { isArtistSaved, setArtistSaved } from '../utils/savedArtists';
 
-/**
- * ArtistDetailsView
- * ------------------
- * Shown when a user taps an artist on the Home page. Lists every song by
- * that artist, pulled from the `songs` collection already loaded from
- * Firestore in App.jsx (no separate network fetch needed — songs simply
- * carry an `artist` name string, so we filter the existing list).
- */
 export default function ArtistDetailsView({ artist, songs, currentTrack, isPlaying, isShuffle, onToggleShuffle, onTogglePlay, onSelectTrack, onBack }) {
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [downloadedMap, setDownloadedMap] = useState({});
   const [isSaved, setIsSaved] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const displayToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
 
   const artistSongs = songs.filter((song) => songMatchesArtist(song, artist.name));
 
@@ -25,13 +23,13 @@ export default function ArtistDetailsView({ artist, songs, currentTrack, isPlayi
 
     const savedFlag = isArtistSaved(artist.id);
     setIsSaved(savedFlag);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songs, artist]);
 
   const handleToggleSave = () => {
     const targetState = !isSaved;
     setIsSaved(targetState);
     setArtistSaved(artist.id, targetState);
+    displayToast(targetState ? 'Saved artist to library' : 'Removed artist from library');
   };
 
   const handleDownloadTrack = async (e, song) => {
@@ -40,8 +38,10 @@ export default function ArtistDetailsView({ artist, songs, currentTrack, isPlayi
       setDownloadedMap(prev => ({ ...prev, [song.id]: 'loading' }));
       await downloadTrackToDevice(song);
       setDownloadedMap(prev => ({ ...prev, [song.id]: true }));
+      displayToast(`"${song.title || song.name}" saved offline!`);
     } catch {
       setDownloadedMap(prev => ({ ...prev, [song.id]: false }));
+      displayToast("Download failed. Check connection.");
     }
     setActiveMenuId(null);
   };
@@ -57,7 +57,7 @@ export default function ArtistDetailsView({ artist, songs, currentTrack, isPlayi
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-        alert("Artist link copied to clipboard!");
+        displayToast("Artist link copied to clipboard!");
       }
     } catch (err) {
       console.log("Artist share sheet dismissed:", err);
@@ -69,6 +69,9 @@ export default function ArtistDetailsView({ artist, songs, currentTrack, isPlayi
     const isArtistSongPlaying = artistSongs.some(track => currentTrack && track.id === currentTrack.id);
     if (isArtistSongPlaying) {
       onTogglePlay();
+    } else if (isShuffle) {
+      const randomIdx = Math.floor(Math.random() * artistSongs.length);
+      onSelectTrack(artistSongs[randomIdx], artistSongs);
     } else {
       onSelectTrack(artistSongs[0], artistSongs);
     }
@@ -77,7 +80,19 @@ export default function ArtistDetailsView({ artist, songs, currentTrack, isPlayi
   const isArtistCurrentlyActiveAndPlaying = isPlaying && artistSongs.some(track => currentTrack && track.id === currentTrack.id);
 
   return (
-    <div className="mobile-content" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: 0, paddingBottom: '160px' }}>
+    <div className="mobile-content" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: 0, paddingBottom: '160px', position: 'relative' }}>
+      {toastMessage && (
+        <div style={{
+          position: 'fixed', top: '24px', left: '20px', right: '20px', zIndex: 9999,
+          backgroundColor: '#0d2218', border: '1px solid var(--accent)', borderRadius: '14px',
+          padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
+        }}>
+          <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+        </div>
+      )}
+
       <div style={{ padding: '0 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', padding: '14px 0 10px 0' }}>
           <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}>
@@ -153,10 +168,7 @@ export default function ArtistDetailsView({ artist, songs, currentTrack, isPlayi
                 <button className="track-options-btn" onClick={() => setActiveMenuId(activeMenuId === song.id ? null : song.id)}><i className="fa-solid fa-ellipsis-vertical"></i></button>
                 {activeMenuId === song.id && (
                   <div className="premium-dropdown-menu" style={{ right: '10px', top: '30px', position: 'absolute', zIndex: 500 }}>
-                    <button onClick={(e) => handleDownloadTrack(e, song)} className="dropdown-playlist-option" style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: dlState === true ? 'var(--accent)' : '#ffffff' }}>
-                      <i className={dlState === 'loading' ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"} style={{ color: dlState === true ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}></i>
-                      <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Track'}</span>
-                    </button>
+                    <button onClick={(e) => handleDownloadTrack(e, song)} className="dropdown-playlist-option" style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: dlState === true ? 'var(--accent)' : '#ffffff' }}><i className={dlState === 'loading' ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"} style={{ color: dlState === true ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}></i><span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Track'}</span></button>
                   </div>
                 )}
               </div>
