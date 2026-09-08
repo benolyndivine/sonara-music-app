@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { downloadTrackToDevice, isTrackCachedOffline } from '../utils/offlineStorage';
+import { downloadTrackToDevice, isTrackCachedOffline, isCanvasVideoCachedOffline, getCanvasVideoSource } from '../utils/offlineStorage';
 import { parseSyncedLyrics, getActiveLyricsLineIndex } from '../utils/lyricsSync';
 
 export default function FullPlayerView({ 
@@ -16,6 +16,11 @@ export default function FullPlayerView({
   const [isDownloading, setIsDownloading] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
+  // 🎬 Spotify Canvas-style 10s looping video
+  const [canvasVideoOn, setCanvasVideoOn] = useState(false);
+  const [videoCachedOffline, setVideoCachedOffline] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
   const displayToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
@@ -26,9 +31,30 @@ export default function FullPlayerView({
   useEffect(() => {
     if (currentTrack) {
       setIsDownloaded(isTrackCachedOffline(currentTrack.id));
+      setVideoCachedOffline(isCanvasVideoCachedOffline(currentTrack.id));
       setLyricsInlineMode(false);
+      setCanvasVideoOn(false); // reset to cover art whenever the track changes
     }
   }, [currentTrack]);
+
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
+
+  // Available whenever it's cached offline, OR we're online and the track has a canvas video
+  const canvasVideoSrc = useMemo(
+    () => getCanvasVideoSource(currentTrack),
+    [currentTrack, videoCachedOffline, isOnline]
+  );
+  const hasCanvasVideo = Boolean(currentTrack?.canvasVideoUrl) || videoCachedOffline;
+  const canPlayCanvasVideo = Boolean(canvasVideoSrc);
 
   const resolvedTitle = currentTrack?.title || currentTrack?.name;
 
@@ -279,12 +305,48 @@ export default function FullPlayerView({
             </div>
           ) : (
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '30px' }}>
-              <div style={{ width: '100%', aspectRatio: '1/1', maxHeight: '380px' }}>
-                <img 
-                  src={resolvedImgSrc} 
-                  alt={resolvedTitle} 
-                  style={{ width: '100%', height: '100%', borderRadius: '16px', objectFit: 'cover', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}
-                />
+              <div style={{ width: '100%', aspectRatio: '1/1', maxHeight: '380px', position: 'relative', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+                {canvasVideoOn && canPlayCanvasVideo ? (
+                  <video
+                    key={canvasVideoSrc}
+                    src={canvasVideoSrc}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <img 
+                    src={resolvedImgSrc} 
+                    alt={resolvedTitle} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                )}
+
+                {hasCanvasVideo && (
+                  <button
+                    onClick={() => canPlayCanvasVideo && setCanvasVideoOn(v => !v)}
+                    disabled={!canPlayCanvasVideo}
+                    title={
+                      !canPlayCanvasVideo
+                        ? 'Canvas video unavailable offline'
+                        : canvasVideoOn ? 'Show cover art' : 'Play 30s Canvas video'
+                    }
+                    style={{
+                      position: 'absolute', bottom: '10px', right: '10px', zIndex: 8,
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+                      border: '1px solid rgba(255,255,255,0.2)', borderRadius: '20px',
+                      padding: '7px 12px', color: '#ffffff', fontSize: '0.72rem', fontWeight: '700',
+                      cursor: canPlayCanvasVideo ? 'pointer' : 'not-allowed',
+                      opacity: canPlayCanvasVideo ? 1 : 0.45
+                    }}
+                  >
+                    <i className={canvasVideoOn ? 'fa-solid fa-image' : 'fa-solid fa-clapperboard'}></i>
+                    {canvasVideoOn ? 'Cover' : 'Video'}
+                  </button>
+                )}
               </div>
 
               {activeTrackLyrics && (

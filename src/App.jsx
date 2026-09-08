@@ -20,7 +20,7 @@ import MiniPlayer from './components/MiniPlayer';
 import BottomNavigation from './components/BottomNavigation';
 import AllSongsView from './components/AllSongsView';
 import AllAlbumsView from './components/AllAlbumsView'; 
-import AllArtistsView from './components/AllArtistsView'; // 🌟 Added View All Artists View
+import AllArtistsView from './components/AllArtistsView';
 import SearchView from './components/SearchView';
 import LibraryView from './components/LibraryView';
 import FullPlayerView from './components/FullPlayerView';
@@ -36,6 +36,8 @@ import ManageAlbumsView from './components/ManageAlbumsView';
 import ManageArtistsView from './components/ManageArtistsView';
 import ManageLyricsView from './components/ManageLyricsView';
 import ManageGenresView from './components/ManageGenresView';
+import ManageSongsAdminView from './components/ManageSongsAdminView';
+import ManageCanvasVideosView from './components/ManageCanvasVideosView';
 import GenreDetailsView from './components/GenreDetailsView';
 import logo from './assets/logo3.png';
 import './App.css';
@@ -66,7 +68,7 @@ export default function App() {
   const [albums, setAlbums] = useState([]);
   const [selectedAlbum, setSelectedAlbum] = useState(null); 
   const [selectedArtist, setSelectedArtist] = useState(null);
-  const [selectedGenre, setSelectedGenre] = useState(null); // 🌟 Added Genre Page State
+  const [selectedGenre, setSelectedGenre] = useState(null);
   const [libraryActiveTab, setLibraryActiveTab] = useState('playlists');
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
 
@@ -85,8 +87,9 @@ export default function App() {
   const [showManageArtists, setShowManageArtists] = useState(false);
   const [showManageLyrics, setShowManageLyrics] = useState(false);
   const [showManageGenres, setShowManageGenres] = useState(false);
+  const [showManageSongs, setShowManageSongs] = useState(false);
+  const [showManageCanvas, setShowManageCanvas] = useState(false);
 
-  // 🌟 NEW QUICK WINS STATES
   const [likedSongIds, setLikedSongIds] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('sonara_liked_songs') || '[]');
@@ -152,7 +155,6 @@ export default function App() {
   const shuffleBagRef = useRef([]);
   const playHistoryRef = useRef([]);
 
-  // 🌟 Toggle Like on Song
   const toggleLikeSong = (song, e) => {
     if (e) e.stopPropagation();
     const songId = song.id || song.title || song.name;
@@ -174,12 +176,11 @@ export default function App() {
     });
   };
 
-  // 🌟 Track Recently Played
   const recordRecentlyPlayed = (track) => {
     if (!track) return;
     setRecentlyPlayed((prev) => {
       const filtered = prev.filter(t => (t.id || t.title) !== (track.id || track.title));
-      const updated = [track, ...filtered].slice(0, 20); // keep last 20
+      const updated = [track, ...filtered].slice(0, 20);
       try {
         localStorage.setItem('sonara_recently_played', JSON.stringify(updated));
       } catch (err) {
@@ -190,12 +191,19 @@ export default function App() {
   };
 
   useEffect(() => {
-    // 🌟 Live app-update check: was a one-time getDoc (only ever checked at
-    // mount, so a version pushed while the app was already open went
-    // unnoticed until the user manually closed/reopened it). onSnapshot keeps
-    // a persistent connection open, so if you update settings/appVersion in
-    // Firestore at any point, every currently-open app instance picks it up
-    // instantly and shows the update notification — no refresh required.
+    if (songs.length === 0) return;
+    setRecentlyPlayed(prev => {
+      const filtered = prev.filter(item => songs.some(s => s.id === item.id));
+      if (filtered.length !== prev.length) {
+        try {
+          localStorage.setItem('sonara_recently_played', JSON.stringify(filtered));
+        } catch (err) {}
+      }
+      return filtered;
+    });
+  }, [songs]);
+
+  useEffect(() => {
     const docRef = doc(db, 'settings', 'appVersion');
     const unsubAppVersion = onSnapshot(
       docRef,
@@ -206,7 +214,6 @@ export default function App() {
             setUpdateInfo(data);
             setHasUnreadNotifications(true);
           } else {
-            // Version doc now matches (or was cleared) — clear any stale banner.
             setUpdateInfo(null);
           }
         }
@@ -364,6 +371,14 @@ export default function App() {
         setShowManageGenres(false);
         return;
       }
+      if (showManageSongs) {
+        setShowManageSongs(false);
+        return;
+      }
+      if (showManageCanvas) {
+        setShowManageCanvas(false);
+        return;
+      }
       if (showProfile) {
         setShowProfile(false);
         return;
@@ -415,6 +430,8 @@ export default function App() {
     showManageArtists,
     showManageLyrics,
     showManageGenres,
+    showManageSongs,
+    showManageCanvas,
     showProfile,
     selectedPlaylist,
     selectedAlbum,
@@ -850,6 +867,24 @@ export default function App() {
     };
   }, [user]);
 
+  // Keep the actively-playing track's Canvas video fields in sync with the live
+  // `songs` list. `currentTrack` is a snapshot captured when playback started, so
+  // without this it never sees a canvasVideoUrl added afterwards (e.g. via the
+  // Manage Canvas Videos admin screen, or the Firestore realtime listener updating
+  // `songs` from another session) and FullPlayerView keeps showing "no video".
+  useEffect(() => {
+    if (!currentTrack) return;
+    const latest = songs.find(s => s.id === currentTrack.id);
+    if (!latest) return;
+    if (latest.canvasVideoUrl !== currentTrack.canvasVideoUrl || latest.canvasStatus !== currentTrack.canvasStatus) {
+      setCurrentTrack((prev) =>
+        prev && prev.id === latest.id
+          ? { ...prev, canvasVideoUrl: latest.canvasVideoUrl, canvasStatus: latest.canvasStatus }
+          : prev
+      );
+    }
+  }, [songs, currentTrack]);
+
   useEffect(() => {
     if (!currentTrack) return;
     const trackUrl = getPlaybackSource(currentTrack);
@@ -1100,6 +1135,9 @@ export default function App() {
     setShowManageAlbums(false);
     setShowManageArtists(false);
     setShowManageLyrics(false);
+    setShowManageGenres(false);
+    setShowManageSongs(false);
+    setShowManageCanvas(false);
     if (Capacitor.isNativePlatform()) await FirebaseAuthentication.signOut();
     await signOut(auth);
   };
@@ -1229,16 +1267,12 @@ export default function App() {
       className={`mobile-container ${increaseContrast ? 'high-contrast-mode' : ''} ${!motionEnabled ? 'disable-animations' : ''}`}
       style={{ '--accent': appTheme }}
     >
-      {/* 🌟 Live update banner — driven by the onSnapshot listener above, so
-          this appears the instant a new version is pushed while the app is
-          already open, with no refresh required. Hidden once dismissed for
-          that specific version; reappears automatically for the NEXT one. */}
       <UpdateAvailableBanner
         updateInfo={dismissedUpdateVersion === updateInfo?.version ? null : updateInfo}
         currentVersion={CURRENT_APP_VERSION}
         onDismiss={handleDismissUpdateBanner}
       />
-      {/* 🍞 Toast Notification Feedback */}
+      {/* 🍞 In-App UI Feedback Toast Notification */}
       {toast && (
         <div
           style={{
@@ -1397,7 +1431,7 @@ export default function App() {
                 </section>
               )}
 
-              {/* 🌟 Moods & Genres Row with All 10 Options including Love & Break Heart */}
+              {/* 🌟 Moods & Genres Row */}
               <section className="content-section" style={{ marginBottom: '24px' }}>
                 <div className="section-header-container">
                   <h2>Moods & Genres</h2>
@@ -1602,7 +1636,7 @@ export default function App() {
             if (diffX > 50) triggerPrevTrackLogic();
             else if (diffX < -50) triggerNextTrackLogic();
           } else {
-            if (diffY > 50) setCurrentTrack(null); // swipe down to dismiss
+            if (diffY > 50) setCurrentTrack(null);
           }
           window._touchStartX = null;
           window._touchStartY = null;
@@ -1659,38 +1693,6 @@ export default function App() {
                       {track.artist || 'Unknown'}
                     </p>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const q = [...(currentQueue.length > 0 ? currentQueue : songs)];
-                        if (i > 0) {
-                          const temp = q[i];
-                          q[i] = q[i - 1];
-                          q[i - 1] = temp;
-                          setCurrentQueue(q);
-                        }
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}
-                    >
-                      <i className="fa-solid fa-arrow-up"></i>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const q = [...(currentQueue.length > 0 ? currentQueue : songs)];
-                        if (i < q.length - 1) {
-                          const temp = q[i];
-                          q[i] = q[i + 1];
-                          q[i + 1] = temp;
-                          setCurrentQueue(q);
-                        }
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}
-                    >
-                      <i className="fa-solid fa-arrow-down"></i>
-                    </button>
-                  </div>
                 </div>
               );
             })}
@@ -1732,29 +1734,19 @@ export default function App() {
           currentVersion={CURRENT_APP_VERSION}
           updateInfo={updateInfo}
           onLogout={handleLogout}
-          onNavigateSettings={() => {
-            setShowSettings(true);
-          }}
+          onNavigateSettings={() => setShowSettings(true)}
           onGoToSavedArtists={() => {
             setLibraryActiveTab('artists');
             setCurrentView('library');
             setShowProfile(false);
           }}
-          onOpenUploadSong={() => {
-            setShowUploadSong(true);
-          }}
-          onOpenManageAlbums={() => {
-            setShowManageAlbums(true);
-          }}
-          onOpenManageArtists={() => {
-            setShowManageArtists(true);
-          }}
-          onOpenManageLyrics={() => {
-            setShowManageLyrics(true);
-          }}
-          onOpenManageGenres={() => {
-            setShowManageGenres(true);
-          }}
+          onOpenUploadSong={() => setShowUploadSong(true)}
+          onOpenManageAlbums={() => setShowManageAlbums(true)}
+          onOpenManageArtists={() => setShowManageArtists(true)}
+          onOpenManageLyrics={() => setShowManageLyrics(true)}
+          onOpenManageGenres={() => setShowManageGenres(true)}
+          onOpenManageSongs={() => setShowManageSongs(true)}
+          onOpenManageCanvas={() => setShowManageCanvas(true)}
           onUpdateProfile={handleUpdateProfile}
           onClose={() => setShowProfile(false)}
         />
@@ -1804,9 +1796,8 @@ export default function App() {
             crossfadeEnabled={crossfadeEnabled}
             setCrossfadeEnabled={setCrossfadeEnabled}
             currentVersion={CURRENT_APP_VERSION}
-            onBack={() => {
-              setShowSettings(false);
-            }}
+            songs={songs}
+            onBack={() => setShowSettings(false)}
           />
         </div>
       )}
@@ -1814,12 +1805,8 @@ export default function App() {
       {showUploadSong && (
         <UploadSongView
           user={user}
-          onBack={() => {
-            setShowUploadSong(false);
-          }}
-          onSongUploaded={(newSong) => {
-            setSongs((prev) => [newSong, ...prev]);
-          }}
+          onBack={() => setShowUploadSong(false)}
+          onSongUploaded={(newSong) => setSongs((prev) => [newSong, ...prev])}
         />
       )}
 
@@ -1827,14 +1814,11 @@ export default function App() {
         <ManageAlbumsView
           albums={albums}
           songs={songs}
-          onBack={() => {
-            setShowManageAlbums(false);
-          }}
-          onAlbumCreated={(newAlbum) => {
-            setAlbums((prev) => [newAlbum, ...prev]);
-          }}
+          onBack={() => setShowManageAlbums(false)}
+          onAlbumCreated={(newAlbum) => setAlbums((prev) => [newAlbum, ...prev])}
           onSongUpdated={(updatedSong) => {
             setSongs((prev) => prev.map(s => s.id === updatedSong.id ? updatedSong : s));
+            setCurrentTrack((prev) => (prev && prev.id === updatedSong.id) ? { ...prev, ...updatedSong } : prev);
           }}
         />
       )}
@@ -1842,12 +1826,8 @@ export default function App() {
       {showManageArtists && (
         <ManageArtistsView
           artists={artists}
-          onBack={() => {
-            setShowManageArtists(false);
-          }}
-          onArtistCreated={(newArtist) => {
-            setArtists((prev) => [newArtist, ...prev]);
-          }}
+          onBack={() => setShowManageArtists(false)}
+          onArtistCreated={(newArtist) => setArtists((prev) => [newArtist, ...prev])}
         />
       )}
 
@@ -1855,9 +1835,7 @@ export default function App() {
         <ManageLyricsView
           songs={songs}
           lyrics={lyrics}
-          onBack={() => {
-            setShowManageLyrics(false);
-          }}
+          onBack={() => setShowManageLyrics(false)}
           onLyricsSaved={(savedLyric) => {
             setLyrics((prev) => {
               const idx = prev.findIndex(l => l.id === savedLyric.id);
@@ -1878,6 +1856,32 @@ export default function App() {
           onBack={() => setShowManageGenres(false)}
           onGenreSaved={(updatedSong) => {
             setSongs((prev) => prev.map(s => s.id === updatedSong.id ? updatedSong : s));
+            setCurrentTrack((prev) => (prev && prev.id === updatedSong.id) ? { ...prev, ...updatedSong } : prev);
+          }}
+        />
+      )}
+
+      {showManageSongs && (
+        <ManageSongsAdminView
+          songs={songs}
+          onBack={() => setShowManageSongs(false)}
+          onSongDeleted={(deletedId) => {
+            setSongs((prev) => prev.filter(s => s.id !== deletedId));
+          }}
+        />
+      )}
+
+      {showManageCanvas && (
+        <ManageCanvasVideosView
+          songs={songs}
+          onBack={() => setShowManageCanvas(false)}
+          onSongUpdated={(updatedSong) => {
+            setSongs((prev) => prev.map(s => s.id === updatedSong.id ? updatedSong : s));
+            // Keep the currently-playing track in sync too, otherwise FullPlayerView
+            // keeps holding the stale copy (without canvasVideoUrl) that was captured
+            // when playback started, and the Canvas video never shows up there even
+            // though the upload succeeded and `songs` was updated.
+            setCurrentTrack((prev) => (prev && prev.id === updatedSong.id) ? { ...prev, ...updatedSong } : prev);
           }}
         />
       )}

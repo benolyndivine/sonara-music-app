@@ -22,6 +22,8 @@ export default function ProfileDrawerView({
   onOpenManageArtists,
   onOpenManageLyrics,
   onOpenManageGenres,
+  onOpenManageSongs,
+  onOpenManageCanvas,
   onUpdateProfile,
   onClose
 }) {
@@ -99,6 +101,7 @@ export default function ProfileDrawerView({
     >
       <style>{profileDrawerStyles}</style>
 
+      {/* Drawer Top Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.3px' }}>
           Account Profile
@@ -117,6 +120,7 @@ export default function ProfileDrawerView({
         </button>
       </div>
 
+      {/* User Info Card */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '22px' }}>
         <div style={{ position: 'relative', marginBottom: '14px' }}>
           <img 
@@ -197,6 +201,7 @@ export default function ProfileDrawerView({
         )}
       </div>
 
+      {/* 👑 Head Admin Control Studio Card */}
       {isHeadAdmin && (
         <div style={{ marginBottom: '18px', backgroundColor: 'rgba(29, 185, 84, 0.04)', padding: '16px 14px', borderRadius: '16px', border: '1px solid rgba(29, 185, 84, 0.18)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', paddingLeft: '4px' }}>
@@ -252,7 +257,27 @@ export default function ProfileDrawerView({
                 <div style={iconBoxStyle}>
                   <i className="fa-solid fa-tags" style={{ color: 'var(--accent)', fontSize: '0.95rem' }}></i>
                 </div>
-                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Manage Song Genres</span>
+                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Manage Genres & Moods</span>
+              </div>
+              <i className="fa-solid fa-chevron-right" style={chevronStyle}></i>
+            </button>
+
+            <button onClick={onOpenManageCanvas} className="pdv-action-row" style={adminRowBtnStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={iconBoxStyle}>
+                  <i className="fa-solid fa-video" style={{ color: 'var(--accent)', fontSize: '0.95rem' }}></i>
+                </div>
+                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Manage Canvas Videos</span>
+              </div>
+              <i className="fa-solid fa-chevron-right" style={chevronStyle}></i>
+            </button>
+
+            <button onClick={onOpenManageSongs} className="pdv-action-row" style={adminRowBtnStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={iconBoxStyle}>
+                  <i className="fa-solid fa-trash-can" style={{ color: '#ff4d4d', fontSize: '0.95rem' }}></i>
+                </div>
+                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Delete Songs (Admin)</span>
               </div>
               <i className="fa-solid fa-chevron-right" style={chevronStyle}></i>
             </button>
@@ -260,6 +285,7 @@ export default function ProfileDrawerView({
         </div>
       )}
 
+      {/* Storage & Offline Card */}
       <div style={{ marginBottom: '18px', backgroundColor: 'rgba(255, 255, 255, 0.02)', padding: '14px 16px', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(29, 185, 84, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -278,7 +304,9 @@ export default function ProfileDrawerView({
         </button>
       </div>
 
+      {/* General Preferences Grouped Card */}
       <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.06)', overflow: 'hidden', marginBottom: '24px' }}>
+        
         <button className="pdv-list-row" onClick={onGoToSavedArtists} style={listRowStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={iconBoxStyle}>
@@ -306,7 +334,7 @@ export default function ProfileDrawerView({
 
         <div style={rowDividerStyle}></div>
 
-        <button className="pdv-list-row" onClick={() => alert(`Sonara App v${currentVersion}`)} style={listRowStyle}>
+        <button className="pdv-list-row" onClick={() => alert(`Sonara App v${currentVersion} — Handcrafted React Cloud Audio Streaming Interface.`)} style={listRowStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={iconBoxStyle}>
               <i className="fa-solid fa-circle-info" style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.95rem' }}></i>
@@ -335,6 +363,7 @@ export default function ProfileDrawerView({
 
         <div style={rowDividerStyle}></div>
 
+        {/* App Version Row */}
         <div style={{ ...listRowStyle, cursor: 'default' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={iconBoxStyle}>
@@ -346,8 +375,10 @@ export default function ProfileDrawerView({
             v{currentVersion}
           </span>
         </div>
+
       </div>
 
+      {/* Sign Out Button */}
       <button 
         onClick={onLogout}
         className="pdv-signout-btn"

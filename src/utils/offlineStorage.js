@@ -110,6 +110,7 @@ export async function downloadTrackToDevice(song) {
 
       saveMeta(total || 4500000);
       localStorage.setItem(`offline_track_${song.id}`, audioUrl);
+      await cacheCanvasVideoIfPresent(song);
 
       if (activeDownloads[song.id]) {
         activeDownloads[song.id].progress = 100;
@@ -162,6 +163,7 @@ export async function downloadTrackToDevice(song) {
 
     saveMeta(statSize);
     localStorage.setItem(`offline_track_${song.id}`, downloadResult.path);
+    await cacheCanvasVideoIfPresent(song);
 
     if (activeDownloads[song.id]) {
       activeDownloads[song.id].progress = 100;
@@ -186,10 +188,63 @@ export async function downloadTrackToDevice(song) {
 }
 
 /**
+ * Best-effort caching of a track's 10s Canvas video for offline playback.
+ * Never throws — a missing/failed video download should not block the audio download.
+ */
+async function cacheCanvasVideoIfPresent(song) {
+  const videoUrl = song.canvasVideoUrl;
+  if (!videoUrl) return;
+
+  try {
+    if (!Capacitor.isNativePlatform()) {
+      // Web/PWA: mirror the audio pattern — store the remote URL as the "offline" source.
+      localStorage.setItem(`offline_video_${song.id}`, videoUrl);
+      return;
+    }
+
+    const filename = `sonara_canvas_${song.id}.mp4`;
+    const downloadResult = await Filesystem.downloadFile({
+      url: videoUrl,
+      path: filename,
+      directory: Directory.Data
+    });
+    localStorage.setItem(`offline_video_${song.id}`, downloadResult.path);
+  } catch (err) {
+    console.warn(`Canvas video caching skipped for "${song.title || song.id}":`, err);
+    localStorage.removeItem(`offline_video_${song.id}`);
+  }
+}
+
+/**
  * Returns true if a specific song ID matching key parameters exists within persistent cached maps
  */
 export function isTrackCachedOffline(songId) {
   return localStorage.getItem(`offline_track_${songId}`) !== null;
+}
+
+/**
+ * Returns true if this track's Canvas video has been cached for offline playback
+ */
+export function isCanvasVideoCachedOffline(songId) {
+  return localStorage.getItem(`offline_video_${songId}`) !== null;
+}
+
+/**
+ * Resolves the best available source for the 10s looping Canvas video:
+ * - a locally cached file (native path converted via Capacitor, or the stored URL on web)
+ * - otherwise the remote Cloudinary URL, but only while online
+ * - null if there's nothing playable right now (no video, or offline with nothing cached)
+ */
+export function getCanvasVideoSource(song) {
+  if (!song) return null;
+
+  const cachedPath = localStorage.getItem(`offline_video_${song.id}`);
+  if (cachedPath) {
+    return Capacitor.isNativePlatform() ? Capacitor.convertFileSrc(cachedPath) : cachedPath;
+  }
+
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+  return song.canvasVideoUrl || null;
 }
 
 /**
@@ -248,9 +303,17 @@ export async function deleteDownloadedSong(songId) {
         directory: Directory.Data
       });
     } catch (_) {}
+    try {
+      const videoFilename = `sonara_canvas_${songId}.mp4`;
+      await Filesystem.deleteFile({
+        path: videoFilename,
+        directory: Directory.Data
+      });
+    } catch (_) {}
   }
   localStorage.removeItem(`offline_track_${songId}`);
   localStorage.removeItem(`offline_meta_${songId}`);
+  localStorage.removeItem(`offline_video_${songId}`);
 }
 
 /**
@@ -290,11 +353,23 @@ export async function clearAllLocalCache() {
         });
       } catch (e) {}
     }
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('offline_video_')) continue;
+      const storedPath = localStorage.getItem(key);
+      if (!storedPath) continue;
+      try {
+        const filename = storedPath.split('/').pop();
+        await Filesystem.deleteFile({ path: filename, directory: Directory.Data });
+      } catch (e) {}
+    }
   }
 
   keysToRemove.forEach((key) => {
     const songId = key.replace('offline_track_', '');
     localStorage.removeItem(key);
     localStorage.removeItem(`offline_meta_${songId}`);
+    localStorage.removeItem(`offline_video_${songId}`);
   });
 }

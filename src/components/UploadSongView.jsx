@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { uploadToCloudinary } from '../services/cloudinaryService';
 
 const MAX_AUDIO_MB = 50;
+const MAX_VIDEO_MB = 20;
 const TITLE_MAX = 60;
 const ARTIST_MAX = 40;
 
@@ -18,6 +19,8 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
   const [songFile, setSongFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
+  const [videoFile, setVideoFile] = useState(null);
+  const [videoPreview, setVideoPreview] = useState(null);
   const [targetCollection, setTargetCollection] = useState('songs');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(null);
@@ -82,8 +85,24 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
     clearFieldError('song');
   };
 
+  const applyVideoFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      setFieldErrors((prev) => ({ ...prev, video: "File must be a video (MP4, MOV, WebM)." }));
+      return;
+    }
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      setFieldErrors((prev) => ({ ...prev, video: `File size exceeds the ${MAX_VIDEO_MB}MB limit.` }));
+      return;
+    }
+    setVideoFile(file);
+    setVideoPreview(URL.createObjectURL(file));
+    clearFieldError('video');
+  };
+
   const handleCoverChange = (e) => applyCoverFile(e.target.files[0]);
   const handleSongChange = (e) => applySongFile(e.target.files[0]);
+  const handleVideoChange = (e) => applyVideoFile(e.target.files[0]);
 
   const removeSong = (e) => {
     e.preventDefault();
@@ -96,6 +115,13 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
     e.stopPropagation();
     setCoverFile(null);
     setCoverPreview(null);
+  };
+
+  const removeVideo = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setVideoFile(null);
+    setVideoPreview(null);
   };
 
   const makeDropHandlers = (kind, apply) => ({
@@ -133,13 +159,14 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
 
     setLoading(true);
     setStep('media');
-    setStatus({ type: 'loading', message: 'Uploading audio & artwork to Cloudinary…' });
+    setStatus({ type: 'loading', message: videoFile ? 'Uploading audio, artwork & Canvas video to Cloudinary…' : 'Uploading audio & artwork to Cloudinary…' });
 
     try {
-      // 1. Upload assets in parallel
-      const [coverUrl, songUrl] = await Promise.all([
+      // 1. Upload assets in parallel (Canvas video is optional)
+      const [coverUrl, songUrl, canvasVideoUrl] = await Promise.all([
         uploadToCloudinary(coverFile, 'image'),
         uploadToCloudinary(songFile, 'video'),
+        videoFile ? uploadToCloudinary(videoFile, 'video') : Promise.resolve(null),
       ]);
 
       setStep('metadata');
@@ -159,6 +186,7 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
         imageUrl: coverUrl,
         songUrl: songUrl,
         audioUrl: songUrl,
+        ...(canvasVideoUrl ? { canvasVideoUrl } : {}),
         uploadedBy: user?.email || 'admin',
         createdAt: new Date().toISOString(),
         uploadedAt: new Date().toISOString(),
@@ -176,6 +204,8 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
       setSongFile(null);
       setCoverFile(null);
       setCoverPreview(null);
+      setVideoFile(null);
+      setVideoPreview(null);
       setFieldErrors({});
       formRef.current?.reset();
 
@@ -442,6 +472,48 @@ export default function UploadSongView({ user, onBack, onSongUploaded }) {
               )}
             </label>
             {fieldErrors.cover && <p style={errorTextStyle}>{fieldErrors.cover}</p>}
+          </div>
+
+          {/* Canvas Video Upload Box (optional, Spotify Canvas-style 10s loop) */}
+          <div>
+            <label style={labelStyle}>
+              <i className="fa-solid fa-clapperboard" style={iconLabelStyle}></i>
+              Canvas Video — 10s Loop (optional)
+            </label>
+            <label
+              className="usv-dropzone"
+              {...makeDropHandlers('video', applyVideoFile)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '14px', position: 'relative',
+                padding: '12px 14px', borderRadius: '14px',
+                border: fieldErrors.video
+                  ? '1.5px solid #ff4d4d'
+                  : videoFile ? '1.5px solid var(--accent)' : dragTarget === 'video' ? '1.5px dashed var(--accent)' : '1.5px dashed rgba(255, 255, 255, 0.12)',
+                backgroundColor: videoFile ? 'rgba(29, 185, 84, 0.05)' : dragTarget === 'video' ? 'rgba(29, 185, 84, 0.04)' : 'rgba(255, 255, 255, 0.02)',
+                cursor: 'pointer'
+              }}
+            >
+              <input type="file" accept="video/*" onChange={handleVideoChange} style={{ display: 'none' }} />
+              {videoPreview ? (
+                <video src={videoPreview} muted style={{ width: '52px', height: '52px', borderRadius: '10px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)', flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: '52px', height: '52px', borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <i className="fa-solid fa-film" style={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '1.1rem' }}></i>
+                </div>
+              )}
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: videoFile ? '#ffffff' : 'rgba(255, 255, 255, 0.8)', fontWeight: '600', textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                  {videoFile ? videoFile.name : dragTarget === 'video' ? 'Drop Canvas video here' : 'Choose Canvas video'}
+                </p>
+                <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>Trim to ~10s, vertical or square, max {MAX_VIDEO_MB}MB</p>
+              </div>
+              {videoFile && (
+                <button type="button" onClick={removeVideo} className="usv-remove-btn" aria-label="Remove video" style={{ position: 'static', marginLeft: '4px' }}>
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              )}
+            </label>
+            {fieldErrors.video && <p style={errorTextStyle}>{fieldErrors.video}</p>}
           </div>
 
           {/* Progress Indicator */}
