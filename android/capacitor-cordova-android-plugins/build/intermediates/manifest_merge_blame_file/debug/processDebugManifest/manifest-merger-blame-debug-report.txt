@@ -1,0 +1,19 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:amazon="http://schemas.amazon.com/apk/res/android"
+3    xmlns:android="http://schemas.android.com/apk/res/android"
+4    package="capacitor.cordova.android.plugins" >
+5
+6    <uses-sdk android:minSdkVersion="24" />
+7
+8    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+8-->C:\Developer\Sonara\android\capacitor-cordova-android-plugins\src\main\AndroidManifest.xml:7:1-66
+8-->C:\Developer\Sonara\android\capacitor-cordova-android-plugins\src\main\AndroidManifest.xml:7:18-64
+9    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+9-->C:\Developer\Sonara\android\capacitor-cordova-android-plugins\src\main\AndroidManifest.xml:8:1-75
+9-->C:\Developer\Sonara\android\capacitor-cordova-android-plugins\src\main\AndroidManifest.xml:8:18-73
+10
+11    <application>
+11-->C:\Developer\Sonara\android\capacitor-cordova-android-plugins\src\main\AndroidManifest.xml:4:1-6:15
+12    </application>
+13
+14</manifest>

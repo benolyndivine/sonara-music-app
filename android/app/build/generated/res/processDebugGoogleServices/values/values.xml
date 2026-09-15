@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="default_web_client_id" translatable="false">614356545369-8g5gnfa3h45bjbaf40hg10trhfeclqdb.apps.googleusercontent.com</string>
+    <string name="gcm_defaultSenderId" translatable="false">614356545369</string>
+    <string name="google_api_key" translatable="false">AIzaSyBbCp86ZPCY7-KC3aiii-Ym1zABJ_f86pk</string>
+    <string name="google_app_id" translatable="false">1:614356545369:android:16a239120c4c8c76dba648</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyBbCp86ZPCY7-KC3aiii-Ym1zABJ_f86pk</string>
+    <string name="google_storage_bucket" translatable="false">sonara-95818.firebasestorage.app</string>
+    <string name="project_id" translatable="false">sonara-95818</string>
+</resources>
