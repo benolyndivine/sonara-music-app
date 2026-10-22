@@ -13,10 +13,12 @@
 			"title": "Sonara",
 			"text": "Playing music in background",
 			"resume": true,
-			"silent": false
+			"silent": true,
+			"hidden": true
 		},
 		"MediaSession": {
-			"smallIcon": "ic_notification"
+			"smallIcon": "ic_notification",
+			"foregroundService": "always"
 		}
 	}
 }

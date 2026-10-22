@@ -2,11 +2,12 @@ import React from 'react';
 import { getRouteIconClass, getRouteLabel } from '../utils/audioRoute';
 import CachedImage from './CachedImage';
 
-export default function MiniPlayer({ currentTrack, isPlaying, trackProgress, trackDuration, audioRoute, onTogglePlay, onNext, onPrev, onExpand }) {
+export default function MiniPlayer({ currentTrack, isPlaying, trackProgress, trackDuration, audioRoute, likedSongIds = [], onToggleLike, onTogglePlay, onNext, onPrev, onExpand }) {
   if (!currentTrack) return null;
 
   const resolvedImgSrc = currentTrack.cover || currentTrack.image || currentTrack.imageUrl;
   const resolvedTitle = currentTrack.title || currentTrack.name;
+  const isLiked = likedSongIds.includes(currentTrack.id || resolvedTitle);
   const progressPercent = trackDuration > 0 ? Math.min(100, (trackProgress / trackDuration) * 100) : 0;
   const routeLabel = getRouteLabel(audioRoute);
 
@@ -50,6 +51,18 @@ export default function MiniPlayer({ currentTrack, isPlaying, trackProgress, tra
 
       {/* Control buttons keep their click isolation to prevent expanding the player view */}
       <div className="mini-player-controls" onClick={(e) => e.stopPropagation()}>
+        <button
+          className="control-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleLike && onToggleLike(currentTrack, e);
+          }}
+          title={isLiked ? "Unlike track" : "Like track"}
+          style={{ color: isLiked ? 'var(--accent)' : 'rgba(255, 255, 255, 0.65)', fontSize: '1rem' }}
+        >
+          <i className={`fa-${isLiked ? 'solid' : 'regular'} fa-heart`}></i>
+        </button>
+
         <button className="control-btn" onClick={onPrev} title="Previous track">
           <i className="fa-solid fa-backward-step"></i>
         </button>
@@ -58,7 +71,7 @@ export default function MiniPlayer({ currentTrack, isPlaying, trackProgress, tra
           {isPlaying ? (
             <i className="fa-solid fa-pause"></i>
           ) : (
-            <i className="fa-solid fa-play"></i>
+            <i className="fa-solid fa-play" style={{ marginLeft: '2px' }}></i>
           )}
         </button>
 

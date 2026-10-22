@@ -15,6 +15,7 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [downloadedMap, setDownloadedMap] = useState({});
   const [toastMessage, setToastMessage] = useState(null);
+  const [searchTab, setSearchTab] = useState('all'); // 'all' | 'songs' | 'artists' | 'albums'
   
   // 🌟 Search History & Trending Searches States
   const [recentSearches, setRecentSearches] = useState(() => {
@@ -65,6 +66,14 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
     setRecentSearches((prev) => {
       const filtered = prev.filter(t => t.toLowerCase() !== term.toLowerCase());
       const updated = [term.trim(), ...filtered].slice(0, 5);
+      try { localStorage.setItem('sonara_recent_searches', JSON.stringify(updated)); } catch (err) {}
+      return updated;
+    });
+  };
+
+  const removeRecentSearch = (term) => {
+    setRecentSearches((prev) => {
+      const updated = prev.filter(t => t.toLowerCase() !== term.toLowerCase());
       try { localStorage.setItem('sonara_recent_searches', JSON.stringify(updated)); } catch (err) {}
       return updated;
     });
@@ -155,7 +164,7 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
         <h2 className="view-title">Search</h2>
       </div>
 
-      <div className="search-input-wrapper" style={{ marginBottom: '24px', position: 'relative' }}>
+      <div className="search-input-wrapper" style={{ marginBottom: '20px', position: 'relative' }}>
         <input
           ref={searchInputRef}
           type="text"
@@ -171,47 +180,132 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
           style={{
             width: '100%', height: '48px', backgroundColor: 'rgba(255, 255, 255, 0.06)',
             border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px',
-            padding: '0 20px 0 48px', color: '#ffffff', outline: 'none', boxSizing: 'border-box'
+            padding: '0 44px 0 48px', color: '#ffffff', outline: 'none', boxSizing: 'border-box',
+            fontSize: '0.92rem'
           }}
         />
         <span style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
           <i className="fa-solid fa-magnifying-glass"></i>
         </span>
+        {searchQuery.trim() !== '' && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery('');
+              if (searchInputRef.current) searchInputRef.current.focus();
+            }}
+            style={{
+              position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+              background: 'rgba(255, 255, 255, 0.15)', border: 'none', borderRadius: '50%',
+              width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#ffffff', cursor: 'pointer', fontSize: '0.75rem'
+            }}
+            title="Clear search"
+          >
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+        )}
       </div>
 
-      {/* 🌟 Recent & Trending Searches */}
+      {/* 🌟 Active Result Filter Chips (shown when user is searching) */}
+      {searchQuery.trim() !== '' && (
+        <div className="quick-filters-scroll" style={{ marginBottom: '22px' }}>
+          {[
+            { id: 'all', label: `All (${filteredSongs.length + filteredArtists.length + filteredAlbums.length})` },
+            { id: 'songs', label: `Songs (${filteredSongs.length})` },
+            { id: 'artists', label: `Artists (${filteredArtists.length})` },
+            { id: 'albums', label: `Albums (${filteredAlbums.length})` }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setSearchTab(tab.id)}
+              className={`quick-filter-chip ${searchTab === tab.id ? 'active' : ''}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 🌟 Recent Searches, Trending & Browse Categories (when search is empty) */}
       {!searchQuery.trim() && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '26px' }}>
           {recentSearches.length > 0 && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#fff' }}>Recent Searches</h3>
-                <button onClick={clearRecentSearches} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '700' }}>Clear</button>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#fff', fontWeight: '700' }}>Recent Searches</h3>
+                <button onClick={clearRecentSearches} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '700' }}>Clear all</button>
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {recentSearches.map((term, i) => (
-                  <button key={i} onClick={() => handleSelectQuery(term)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '6px 14px', borderRadius: '12px', fontSize: '0.82rem', cursor: 'pointer' }}>
-                    {term}
-                  </button>
+                  <div
+                    key={i}
+                    onClick={() => handleSelectQuery(term)}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                      color: '#fff', padding: '6px 12px', borderRadius: '14px', fontSize: '0.82rem',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                      transition: 'background-color 0.15s ease'
+                    }}
+                  >
+                    <span>{term}</span>
+                    <i
+                      className="fa-solid fa-xmark"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeRecentSearch(term);
+                      }}
+                      style={{ opacity: 0.5, fontSize: '0.75rem', cursor: 'pointer' }}
+                      title="Remove"
+                    ></i>
+                  </div>
                 ))}
               </div>
             </div>
           )}
 
           <div>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#fff' }}>Trending Searches</h3>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#fff', fontWeight: '700' }}>Trending Searches</h3>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {trendingQueries.map((trend, i) => (
-                <button key={i} onClick={() => handleSelectQuery(trend)} style={{ background: 'rgba(29, 185, 84, 0.1)', border: '1px solid rgba(29, 185, 84, 0.3)', color: 'var(--accent)', padding: '6px 14px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer' }}>
+                <button key={i} onClick={() => handleSelectQuery(trend)} style={{ background: 'rgba(29, 185, 84, 0.1)', border: '1px solid rgba(29, 185, 84, 0.3)', color: 'var(--accent)', padding: '7px 14px', borderRadius: '14px', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer' }}>
                   <i className="fa-solid fa-arrow-trend-up" style={{ marginRight: '6px' }}></i>{trend}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 🌟 Modern 2-Column "Browse Categories" Visual Grid */}
+          <div>
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '1.05rem', color: '#ffffff', fontWeight: '700' }}>Browse Categories</h3>
+            <div className="browse-categories-grid">
+              {[
+                { title: 'Kollywood Hits', bg: 'linear-gradient(135deg, #f43f5e 0%, #be123c 60%, #881337 100%)', icon: 'fa-fire', query: 'Kollywood' },
+                { title: 'Melody Magic', bg: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 60%, #1e3a8a 100%)', icon: 'fa-headphones', query: 'Melody' },
+                { title: 'Party & EDM', bg: 'linear-gradient(135deg, #c084fc 0%, #9333ea 60%, #581c87 100%)', icon: 'fa-compact-disc', query: 'Party' },
+                { title: 'Chill & Relax', bg: 'linear-gradient(135deg, #34d399 0%, #059669 60%, #064e3b 100%)', icon: 'fa-mug-hot', query: 'Chill' },
+                { title: 'Romance & Love', bg: 'linear-gradient(135deg, #fb7185 0%, #e11d48 60%, #9f1239 100%)', icon: 'fa-heart', query: 'Love' },
+                { title: 'Devotional Songs', bg: 'linear-gradient(135deg, #fbbf24 0%, #d97706 60%, #78350f 100%)', icon: 'fa-hands-praying', query: 'Devotional' },
+                { title: 'Hip Hop & Rap', bg: 'linear-gradient(135deg, #f472b6 0%, #db2777 60%, #831843 100%)', icon: 'fa-bolt', query: 'Hip Hop' },
+                { title: 'Classical & Acoustic', bg: 'linear-gradient(135deg, #818cf8 0%, #4f46e5 60%, #312e81 100%)', icon: 'fa-guitar', query: 'Classical' }
+              ].map((cat) => (
+                <div
+                  key={cat.title}
+                  className="category-browse-card"
+                  style={{ background: cat.bg }}
+                  onClick={() => handleSelectQuery(cat.query)}
+                >
+                  <i className={`fa-solid ${cat.icon} category-browse-icon`}></i>
+                  <span className="category-browse-title">{cat.title}</span>
+                </div>
               ))}
             </div>
           </div>
         </div>
       )}
 
-      {searchQuery.trim() !== '' && filteredArtists.length > 0 && (
+      {/* 🌟 Artists Results */}
+      {searchQuery.trim() !== '' && (searchTab === 'all' || searchTab === 'artists') && filteredArtists.length > 0 && (
         <section style={{ marginBottom: '28px' }}>
           <h3 style={{ fontSize: '1.1rem', color: '#ffffff', marginBottom: '14px', fontWeight: '700' }}>Artists</h3>
           <div className="horizontal-scroll" style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '10px' }}>
@@ -248,7 +342,8 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
         </section>
       )}
 
-      {searchQuery.trim() !== '' && filteredAlbums.length > 0 && (
+      {/* 🌟 Albums Results */}
+      {searchQuery.trim() !== '' && (searchTab === 'all' || searchTab === 'albums') && filteredAlbums.length > 0 && (
         <section style={{ marginBottom: '28px' }}>
           <h3 style={{ fontSize: '1.1rem', color: '#ffffff', marginBottom: '14px', fontWeight: '700' }}>Albums</h3>
           <div className="horizontal-scroll" style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '10px' }}>
@@ -265,7 +360,8 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
         </section>
       )}
 
-      {searchQuery.trim() !== '' && (
+      {/* 🌟 Songs Results */}
+      {searchQuery.trim() !== '' && (searchTab === 'all' || searchTab === 'songs') && (
         <section>
           <h3 style={{ fontSize: '1.1rem', color: '#ffffff', marginBottom: '14px', fontWeight: '700' }}>Songs</h3>
           

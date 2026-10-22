@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { collection, doc, addDoc, deleteDoc, query, where, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, deleteDoc, query, where, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app'; 
@@ -41,11 +41,24 @@ import ManageSongsAdminView from './components/ManageSongsAdminView';
 import ManageCanvasVideosView from './components/ManageCanvasVideosView';
 import GenreDetailsView from './components/GenreDetailsView';
 import CachedImage from './components/CachedImage';
+import {
+  getPlaybackSpeedSetting, setPlaybackSpeedSetting,
+  getNormalizeVolumeSetting, setNormalizeVolumeSetting,
+  getOfflineOnlyModeSetting, setOfflineOnlyModeSetting,
+  getAutoplayInfiniteSetting, setAutoplayInfiniteSetting,
+  getSpatialAudioSetting, setSpatialAudioSetting,
+  getHapticsSetting, setHapticsSetting,
+  getEqPresetSetting, setEqPresetSetting,
+  getKeepScreenAwakeSetting, requestScreenWakeLock, releaseScreenWakeLock,
+  applyAudioEffectsToElement, applyAudioEffectsToNative,
+  triggerHaptic
+} from './utils/audioEffects';
+import { APP_THEMES, getSavedThemeId, getThemeById, saveThemeId } from './utils/themes';
+import { CURRENT_APP_VERSION, isNewerVersion, notifyAppUpdate } from './utils/updateService';
 import logo from './assets/logo3.png';
 import './App.css';
 
 const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
-const CURRENT_APP_VERSION = '1.2.2';
 
 const shuffleArray = (arr) => {
   const a = [...arr];
@@ -57,8 +70,10 @@ const shuffleArray = (arr) => {
 };
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => auth.currentUser || null);
+  const [authResolved, setAuthResolved] = useState(false);
+  const [isSyncingAccount, setIsSyncingAccount] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [songs, setSongs] = useState([]);
   const [artists, setArtists] = useState([]);
   const [playlists, setPlaylists] = useState([]);
@@ -75,9 +90,17 @@ export default function App() {
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
 
   const [currentView, setCurrentView] = useState('home');
+  const [homeFilter, setHomeFilter] = useState('All');
   const [currentQueue, setCurrentQueue] = useState([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const wasOnlineRef = useRef(navigator.onLine);
+
+  const greetingText = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
   // 🎧 Which output the phone is currently routed to — a Bluetooth car/
   // headset, a wired connection, or the built-in speaker. Powers the
   // "Connected to ..." indicator in MiniPlayer / FullPlayerView.
@@ -95,6 +118,7 @@ export default function App() {
   const [showManageGenres, setShowManageGenres] = useState(false);
   const [showManageSongs, setShowManageSongs] = useState(false);
   const [showManageCanvas, setShowManageCanvas] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
 
   // 🔄 SYNC FIX: Liked Songs and Recently Played used to live only in this
   // device's localStorage, so they never followed the account — a different
@@ -144,16 +168,103 @@ export default function App() {
   const [trackProgress, setTrackProgress] = useState(0);
   const [trackDuration, setTrackDuration] = useState(0);
 
-  const [increaseContrast, setIncreaseContrast] = useState(false);
-  const [automaticallySendDiagnostics, setAutomaticallySendDiagnostics] = useState(true);
+  const [increaseContrast, setIncreaseContrastState] = useState(() => localStorage.getItem('sonara_increase_contrast') === 'true');
+  const setIncreaseContrast = (val) => {
+    setIncreaseContrastState(val);
+    try { localStorage.setItem('sonara_increase_contrast', String(val)); } catch {}
+  };
 
-  const [contentRestrictions, setContentRestrictions] = useState(false);
-  const [appTheme, setAppTheme] = useState('#1db954');
-  const [motionEnabled, setMotionEnabled] = useState(true);
-  const [lyricsSize, setLyricsSize] = useState('Normal');
-  const [crossfadeEnabled, setCrossfadeEnabled] = useState(() => {
+  const [automaticallySendDiagnostics, setAutomaticallySendDiagnosticsState] = useState(() => localStorage.getItem('sonara_diagnostics') !== 'false');
+  const setAutomaticallySendDiagnostics = (val) => {
+    setAutomaticallySendDiagnosticsState(val);
+    try { localStorage.setItem('sonara_diagnostics', String(val)); } catch {}
+  };
+
+  const [contentRestrictions, setContentRestrictionsState] = useState(() => localStorage.getItem('sonara_content_restrictions') === 'true');
+  const setContentRestrictions = (val) => {
+    setContentRestrictionsState(val);
+    try { localStorage.setItem('sonara_content_restrictions', String(val)); } catch {}
+  };
+  const [themeId, setThemeId] = useState(getSavedThemeId);
+  const currentTheme = useMemo(() => getThemeById(themeId), [themeId]);
+  const [appTheme, setAppTheme] = useState(() => currentTheme.accent);
+
+  const handleSelectTheme = (newThemeId) => {
+    setThemeId(newThemeId);
+    saveThemeId(newThemeId);
+    const chosen = getThemeById(newThemeId);
+    setAppTheme(chosen.accent);
+  };
+
+  const [motionEnabled, setMotionEnabledState] = useState(() => localStorage.getItem('sonara_motion_enabled') !== 'false');
+  const setMotionEnabled = (val) => {
+    setMotionEnabledState(val);
+    try { localStorage.setItem('sonara_motion_enabled', String(val)); } catch {}
+  };
+
+  const [lyricsSize, setLyricsSizeState] = useState(() => localStorage.getItem('sonara_lyrics_size') || 'Normal');
+  const setLyricsSize = (val) => {
+    setLyricsSizeState(val);
+    try { localStorage.setItem('sonara_lyrics_size', val); } catch {}
+  };
+
+  const [crossfadeEnabled, setCrossfadeEnabledState] = useState(() => {
     try { return localStorage.getItem('sonara_crossfade') === 'true'; } catch { return false; }
   });
+  const setCrossfadeEnabled = (val) => {
+    setCrossfadeEnabledState(val);
+    try { localStorage.setItem('sonara_crossfade', String(val)); } catch {}
+  };
+
+  // 🎛️ Dynamic Audio Engine Settings
+  const [playbackSpeed, setPlaybackSpeedState] = useState(getPlaybackSpeedSetting);
+  const setPlaybackSpeed = (val) => {
+    setPlaybackSpeedState(val);
+    setPlaybackSpeedSetting(val);
+  };
+
+  const [normalizeVolume, setNormalizeVolumeState] = useState(getNormalizeVolumeSetting);
+  const setNormalizeVolume = (val) => {
+    setNormalizeVolumeState(val);
+    setNormalizeVolumeSetting(val);
+  };
+
+  const [offlineOnlyMode, setOfflineOnlyModeState] = useState(getOfflineOnlyModeSetting);
+  const setOfflineOnlyMode = (val) => {
+    setOfflineOnlyModeState(val);
+    setOfflineOnlyModeSetting(val);
+  };
+
+  const [autoplayInfinite, setAutoplayInfiniteState] = useState(getAutoplayInfiniteSetting);
+  const setAutoplayInfinite = (val) => {
+    setAutoplayInfiniteState(val);
+    setAutoplayInfiniteSetting(val);
+  };
+
+  const [spatialAudio, setSpatialAudioState] = useState(getSpatialAudioSetting);
+  const setSpatialAudio = (val) => {
+    setSpatialAudioState(val);
+    setSpatialAudioSetting(val);
+  };
+
+  const [hapticsEnabled, setHapticsEnabledState] = useState(getHapticsSetting);
+  const setHapticsEnabled = (val) => {
+    setHapticsEnabledState(val);
+    setHapticsSetting(val);
+  };
+
+  const [eqPreset, setEqPresetState] = useState(getEqPresetSetting);
+  const setEqPreset = (val) => {
+    setEqPresetState(val);
+    setEqPresetSetting(val);
+  };
+
+  useEffect(() => {
+    if (getKeepScreenAwakeSetting()) {
+      requestScreenWakeLock();
+    }
+    return () => releaseScreenWakeLock();
+  }, []);
 
   const audioRef = useRef(null);
   const mediaRef = useRef(null);
@@ -217,9 +328,10 @@ export default function App() {
       (snap) => {
         if (snap.exists()) {
           const data = snap.data();
-          if (data.version && data.version !== CURRENT_APP_VERSION) {
+          if (data.version && isNewerVersion(data.version, CURRENT_APP_VERSION)) {
             setUpdateInfo(data);
             setHasUnreadNotifications(true);
+            notifyAppUpdate(data);
           } else {
             setUpdateInfo(null);
           }
@@ -250,7 +362,7 @@ export default function App() {
         return time > 0 && (now - time) <= TWO_DAYS_MS;
       });
 
-      const hasUpdateUnread = updateInfo && !clearedIds.includes('update_' + updateInfo.version) && !readIds.includes('update_' + updateInfo.version);
+      const hasUpdateUnread = updateInfo && isNewerVersion(updateInfo.version, CURRENT_APP_VERSION) && !clearedIds.includes('update_' + updateInfo.version) && !readIds.includes('update_' + updateInfo.version);
 
       setHasUnreadNotifications(unreadRecentSongExists || !!hasUpdateUnread);
     } catch {
@@ -268,58 +380,15 @@ export default function App() {
     const configureStatusBar = async () => {
       try {
         await StatusBar.setOverlaysWebView({ overlay: true });
-        await StatusBar.setStyle({ style: Style.Dark });
+        const isLightTheme = themeId && themeId.includes('light');
+        await StatusBar.setStyle({ style: isLightTheme ? Style.Light : Style.Dark });
       } catch (err) {
         console.warn('Status bar overlay configuration failed:', err);
       }
     };
 
     configureStatusBar();
-  }, []);
-
-  // Keeps the status bar tinted to match whichever full-screen surface is
-  // actually sitting directly under it right now, instead of one fixed
-  // color for the whole app. Regular pages (home/search/library/etc.) all
-  // sit under the opaque <Header>, so that's the default; any full-screen
-  // overlay opened on top (full player, profile, downloads, settings, the
-  // admin "manage" screens, notifications, the queue sheet) briefly takes
-  // over the status bar with its own background color while it's open.
-  // Ordered so whichever overlay can be open at the same time as another
-  // (rare, but e.g. notifications over full player) wins as the topmost.
-  const activeStatusBarColor = showFullPlayer
-    ? '#05070c'
-    : showQueueModal
-    ? '#05070c'
-    : showNotifications
-    ? '#05070c'
-    : showProfile
-    ? '#05070c'
-    : showDownloads
-    ? '#05070c'
-    : showUploadSong
-    ? '#05070c'
-    : showManageAlbums
-    ? '#05070c'
-    : showManageArtists
-    ? '#05070c'
-    : showManageLyrics
-    ? '#05070c'
-    : showManageGenres
-    ? '#05070c'
-    : showManageSongs
-    ? '#05070c'
-    : showManageCanvas
-    ? '#05070c'
-    : showSettings
-    ? '#060c18'
-    : '#090d14'; // matches .mobile-header, which sits directly below the status bar on every regular page
-
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-    StatusBar.setBackgroundColor({ color: activeStatusBarColor }).catch((err) => {
-      console.warn('Status bar color update failed:', err);
-    });
-  }, [activeStatusBarColor]);
+  }, [themeId]);
 
   const ensureStoragePermission = async () => {
     if (!Capacitor.isNativePlatform()) return true;
@@ -377,123 +446,141 @@ export default function App() {
     screenSnapshotRef.current = nextSnapshot;
   }, [currentView, selectedAlbum, selectedArtist, selectedGenre, libraryActiveTab, selectedPlaylist]);
 
+  const backHandlerStateRef = useRef({});
+  useEffect(() => {
+    backHandlerStateRef.current = {
+      showAboutModal,
+      showQueueModal,
+      showFullPlayer,
+      showDownloads,
+      showNotifications,
+      showSettings,
+      showUploadSong,
+      showManageAlbums,
+      showManageArtists,
+      showManageLyrics,
+      showManageGenres,
+      showManageSongs,
+      showManageCanvas,
+      showProfile,
+      selectedPlaylist,
+      selectedAlbum,
+      selectedArtist,
+      selectedGenre,
+      currentView
+    };
+  });
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
-    const backButtonListener = CapacitorApp.addListener('backButton', () => {
-      if (showQueueModal) {
-        setShowQueueModal(false);
-        return;
-      }
-      if (showFullPlayer) {
-        setShowFullPlayer(false);
-        return;
-      }
-      if (showDownloads) {
-        setShowDownloads(false);
-        return;
-      }
-      if (showNotifications) {
-        setShowNotifications(false);
-        return;
-      }
-      if (showSettings) {
-        setShowSettings(false);
-        return;
-      }
-      if (showUploadSong) {
-        setShowUploadSong(false);
-        return;
-      }
-      if (showManageAlbums) {
-        setShowManageAlbums(false);
-        return;
-      }
-      if (showManageArtists) {
-        setShowManageArtists(false);
-        return;
-      }
-      if (showManageLyrics) {
-        setShowManageLyrics(false);
-        return;
-      }
-      if (showManageGenres) {
-        setShowManageGenres(false);
-        return;
-      }
-      if (showManageSongs) {
-        setShowManageSongs(false);
-        return;
-      }
-      if (showManageCanvas) {
-        setShowManageCanvas(false);
-        return;
-      }
-      if (showProfile) {
-        setShowProfile(false);
-        return;
-      }
-      if (selectedPlaylist) {
-        setSelectedPlaylist(null);
-        return;
-      }
-      if (selectedAlbum) {
-        setSelectedAlbum(null);
-        return;
-      }
-      if (selectedArtist) {
-        setSelectedArtist(null);
-        return;
-      }
-      if (selectedGenre) {
-        setSelectedGenre(null);
-        return;
-      }
+    let listenerHandle = null;
+    const registerListener = async () => {
+      listenerHandle = await CapacitorApp.addListener('backButton', () => {
+        const state = backHandlerStateRef.current;
+        if (state.showAboutModal) {
+          setShowAboutModal(false);
+          return;
+        }
+        if (state.showQueueModal) {
+          setShowQueueModal(false);
+          return;
+        }
+        if (state.showFullPlayer) {
+          setShowFullPlayer(false);
+          return;
+        }
+        if (state.showDownloads) {
+          setShowDownloads(false);
+          return;
+        }
+        if (state.showNotifications) {
+          setShowNotifications(false);
+          return;
+        }
+        if (state.showSettings) {
+          setShowSettings(false);
+          return;
+        }
+        if (state.showUploadSong) {
+          setShowUploadSong(false);
+          return;
+        }
+        if (state.showManageAlbums) {
+          setShowManageAlbums(false);
+          return;
+        }
+        if (state.showManageArtists) {
+          setShowManageArtists(false);
+          return;
+        }
+        if (state.showManageLyrics) {
+          setShowManageLyrics(false);
+          return;
+        }
+        if (state.showManageGenres) {
+          setShowManageGenres(false);
+          return;
+        }
+        if (state.showManageSongs) {
+          setShowManageSongs(false);
+          return;
+        }
+        if (state.showManageCanvas) {
+          setShowManageCanvas(false);
+          return;
+        }
+        if (state.showProfile) {
+          setShowProfile(false);
+          return;
+        }
+        if (state.selectedPlaylist) {
+          setSelectedPlaylist(null);
+          return;
+        }
+        if (state.selectedAlbum) {
+          setSelectedAlbum(null);
+          return;
+        }
+        if (state.selectedArtist) {
+          setSelectedArtist(null);
+          return;
+        }
+        if (state.selectedGenre) {
+          setSelectedGenre(null);
+          return;
+        }
 
-      const previous = navHistoryRef.current.pop();
-      if (previous) {
-        isBackNavigationRef.current = true;
-        setCurrentView(previous.currentView);
-        setSelectedAlbum(previous.selectedAlbum);
-        setSelectedArtist(previous.selectedArtist);
-        setSelectedGenre(previous.selectedGenre);
-        setLibraryActiveTab(previous.libraryActiveTab);
-        setSelectedPlaylist(previous.selectedPlaylist);
-      } else if (currentView !== 'home') {
-        setCurrentView('home');
-      } else {
-        CapacitorApp.minimizeApp();
-      }
-    });
+        const previous = navHistoryRef.current.pop();
+        if (previous) {
+          isBackNavigationRef.current = true;
+          setCurrentView(previous.currentView);
+          setSelectedAlbum(previous.selectedAlbum);
+          setSelectedArtist(previous.selectedArtist);
+          setSelectedGenre(previous.selectedGenre);
+          setLibraryActiveTab(previous.libraryActiveTab);
+          setSelectedPlaylist(previous.selectedPlaylist);
+        } else if (state.currentView !== 'home') {
+          setCurrentView('home');
+        } else {
+          CapacitorApp.minimizeApp();
+        }
+      });
+    };
+
+    registerListener();
 
     return () => {
-      backButtonListener.then((listener) => listener.remove());
+      if (listenerHandle) {
+        listenerHandle.remove();
+      }
     };
-  }, [
-    showQueueModal,
-    showFullPlayer,
-    showDownloads,
-    showNotifications,
-    showSettings,
-    showUploadSong,
-    showManageAlbums,
-    showManageArtists,
-    showManageLyrics,
-    showManageGenres,
-    showManageSongs,
-    showManageCanvas,
-    showProfile,
-    selectedPlaylist,
-    selectedAlbum,
-    selectedArtist,
-    selectedGenre,
-    currentView
-  ]);
+  }, []);
 
-  const audioStateRef = useRef({ songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying });
+  const audioStateRef = useRef({ songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying, autoplayInfinite });
   useEffect(() => {
-    audioStateRef.current = { songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying };
-  }, [songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying]);
+    audioStateRef.current = { songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying, autoplayInfinite };
+  }, [songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying, autoplayInfinite]);
 
   useEffect(() => {
     const goOnline = () => setIsOnline(true);
@@ -522,7 +609,8 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser ?? null);
-      if (!currentUser) setLoading(false);
+      setAuthResolved(true);
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -648,22 +736,15 @@ export default function App() {
       try {
         try {
           const notifStatus = await BackgroundMode.checkNotificationsPermission();
-          if (notifStatus?.status !== 'granted') {
+          if (notifStatus?.status !== 'granted' && notifStatus?.notifications !== 'granted') {
             await BackgroundMode.requestNotificationsPermission();
           }
         } catch (checkErr) {
           console.warn('Notification permission check failed:', checkErr);
         }
 
-        await BackgroundMode.enable({
-          title: "Sonara",
-          text: "Playing music...",
-          icon: "icon",
-          color: "1db954",
-          hidden: false,
-          bigText: true
-        });
-
+        // MediaSessionService handles native foreground media playback and notifications.
+        // BackgroundMode.enable() is not needed and avoiding it prevents its 20-second timeout crash.
         await BackgroundMode.disableWebViewOptimizations();
 
         try {
@@ -719,7 +800,7 @@ export default function App() {
   }, []);
 
   const triggerNextTrackLogic = () => {
-    const { songs: s, currentQueue: q, currentTrack: t, isShuffle: sh } = audioStateRef.current;
+    const { songs: s, currentQueue: q, currentTrack: t, isShuffle: sh, autoplayInfinite: autoInf } = audioStateRef.current;
     const queue = q.length > 0 ? q : s;
     if (!queue.length) return;
     
@@ -727,16 +808,28 @@ export default function App() {
     if (sh) {
       if (queue.length > 1) {
         if (!shuffleBagRef.current || shuffleBagRef.current.length === 0) {
+          if (!autoInf) {
+            setIsPlaying(false);
+            return;
+          }
           const remainingIds = queue.filter(track => track.id !== t?.id).map(track => track.id);
           shuffleBagRef.current = shuffleArray(remainingIds);
         }
         const nextId = shuffleBagRef.current.shift();
         next = queue.find(track => track.id === nextId) || queue[0];
       } else {
+        if (!autoInf) {
+          setIsPlaying(false);
+          return;
+        }
         next = queue[0];
       }
     } else {
       const idx = queue.findIndex(track => track.id === t?.id);
+      if (!autoInf && idx === queue.length - 1) {
+        setIsPlaying(false);
+        return;
+      }
       next = queue[(idx + 1) % queue.length];
     }
     handleTrackSelection(next, queue, false);
@@ -777,6 +870,54 @@ export default function App() {
       }
       return nextVal;
     });
+  };
+
+  const updateMediaSession = async (track, playing) => {
+    if (!track) {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await MediaSession.setPlaybackState({ playbackState: 'none', state: 'none' });
+        } catch (_) {}
+      } else if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'none';
+      }
+      return;
+    }
+
+    const coverUrl = track.cover || track.image || track.imageUrl;
+    const artworkList = coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : [];
+    const title = track.title || track.name || 'Unknown Title';
+    const artist = track.artist || 'Unknown Artist';
+    const album = track.album || 'Sonara';
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await MediaSession.setMetadata({
+          title,
+          artist,
+          album,
+          artwork: artworkList,
+        });
+        await MediaSession.setPlaybackState({
+          playbackState: playing ? 'playing' : 'paused',
+          state: playing ? 'playing' : 'paused',
+        });
+      } catch (err) {
+        console.warn('MediaSession sync error:', err);
+      }
+    } else if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title,
+          artist,
+          album,
+          artwork: artworkList,
+        });
+        navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+      } catch (err) {
+        console.warn('Web mediaSession sync error:', err);
+      }
+    }
   };
 
   const startNativeTrack = (track, autoplay = true) => {
@@ -822,9 +963,7 @@ export default function App() {
       media.onError.subscribe((err) => console.error('Native audio playback error:', err));
     }
 
-    if (Capacitor.isNativePlatform()) {
-      MediaSession.setPlaybackState({ state: autoplay ? 'playing' : 'paused' }).catch(() => {});
-    }
+    updateMediaSession(track, autoplay);
 
     if (autoplay) {
       media.play();
@@ -983,20 +1122,15 @@ export default function App() {
   }, [songs, currentTrack]);
 
   useEffect(() => {
-    if (!currentTrack) return;
+    if (!currentTrack) {
+      updateMediaSession(null, false);
+      return;
+    }
     const trackUrl = getPlaybackSource(currentTrack);
     if (!trackUrl) return;
 
     if (Capacitor.isNativePlatform()) {
-      MediaSession.setMetadata({
-        title:  currentTrack.title  || currentTrack.name  || 'Unknown Title',
-        artist: currentTrack.artist || 'Unknown Artist',
-        album:  currentTrack.album  || 'Sonara',
-      })
-        .then(async () => {
-          await MediaSession.setPlaybackState({ state: isPlaying ? 'playing' : 'paused' });
-        })
-        .catch(err => console.warn('MediaSession sync error:', err));
+      updateMediaSession(currentTrack, isPlaying);
       return;
     }
 
@@ -1014,19 +1148,9 @@ export default function App() {
       audioRef.current.src = trackUrl;
       setTrackProgress(0);
       setTrackDuration(0);
-
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'playing';
-      }
     }
 
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title:  currentTrack.title  || currentTrack.name  || 'Unknown Title',
-        artist: currentTrack.artist || '',
-        album:  'Sonara',
-      });
-    }
+    updateMediaSession(currentTrack, isPlaying);
 
     const handleTimeUpdate = () => {
       setTrackProgress(audioRef.current.currentTime);
@@ -1037,6 +1161,12 @@ export default function App() {
     };
 
     const handleEnded = () => {
+      if (sleepTimeLeft === 'end_of_song' || sleepTimeLeft === 0) {
+        setIsPlaying(false);
+        setSleepTimeLeft(null);
+        showToast("Sleep timer completed — playback paused", "info", "fa-moon");
+        return;
+      }
       const { isRepeat: r } = audioStateRef.current;
       if (r) {
         audioRef.current.currentTime = 0;
@@ -1073,7 +1203,10 @@ export default function App() {
         } else {
           mediaRef.current.pause();
         }
-        MediaSession.setPlaybackState({ state: isPlaying ? 'playing' : 'paused' }).catch(() => {});
+        MediaSession.setPlaybackState({
+          playbackState: isPlaying ? 'playing' : 'paused',
+          state: isPlaying ? 'playing' : 'paused',
+        }).catch(() => {});
       }
       return;
     }
@@ -1144,14 +1277,15 @@ export default function App() {
   }, [currentQueue, songs, isShuffle, isRepeat, isOnline]);
 
   useEffect(() => {
-    if (sleepTimeLeft === null) return;
+    if (sleepTimeLeft === null || sleepTimeLeft === 'end_of_song') return;
     if (sleepTimeLeft <= 0) {
       setIsPlaying(false);
       setSleepTimeLeft(null);
+      showToast("Sleep timer completed — music paused", "info", "fa-moon");
       return;
     }
     sleepTimerRef.current = setTimeout(() => {
-      setSleepTimeLeft(prev => prev - 1);
+      setSleepTimeLeft(prev => typeof prev === 'number' ? prev - 1 : prev);
     }, 60000);
     return () => clearTimeout(sleepTimerRef.current);
   }, [sleepTimeLeft]);
@@ -1165,7 +1299,8 @@ export default function App() {
       mediaRef.current?.seekTo(newTime * 1000);
       const dur = typeof mediaRef.current?.getDuration === 'function' ? mediaRef.current.getDuration() : 0;
       if (dur > 0) {
-        MediaSession.setPositionState({ duration: dur, playbackRate: 1.0, position: newTime }).catch(() => {});
+        const rate = parseFloat(playbackSpeed) || 1.0;
+        MediaSession.setPositionState({ duration: dur, playbackRate: rate, position: newTime }).catch(() => {});
       }
       return;
     }
@@ -1174,8 +1309,25 @@ export default function App() {
     audioRef.current.currentTime = newTime;
   };
 
+  // 🎛️ Actively apply playback speed to audio engines
+  useEffect(() => {
+    applyAudioEffectsToElement(audioRef.current, { speed: playbackSpeed });
+    if (mediaRef.current && playbackSpeed !== '1.0x') {
+      applyAudioEffectsToNative(mediaRef.current, { speed: playbackSpeed });
+    }
+  }, [playbackSpeed, currentTrack, isPlaying]);
+
   const handleTrackSelection = async (track, customQueue = null, resetBag = true) => {
     if (!track) return;
+
+    // 🛡️ Strict Offline Only Mode enforcement
+    if (offlineOnlyMode && !isTrackCachedOffline(track.id)) {
+      showToast("Offline Mode Active — track is not cached on device", "info", "fa-cloud-slash");
+      triggerHaptic(40);
+      return;
+    }
+    triggerHaptic(20);
+
     const newQueue = customQueue?.length ? customQueue : songs;
     setCurrentQueue(newQueue);
     
@@ -1222,14 +1374,89 @@ export default function App() {
     }
   };
 
+  const handleSyncAccountData = async () => {
+    if (!user?.uid) return;
+    setIsSyncingAccount(true);
+    try {
+      // 1. Flush local likes, recently played, and current track to Firestore
+      const userStatusRef = doc(db, 'users', user.uid);
+      await setDoc(userStatusRef, {
+        likedSongIds: likedSongIds || [],
+        recentlyPlayed: recentlyPlayedEntries || [],
+        lastPlayedTrackId: currentTrack?.id || null,
+        syncedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // 2. Fetch fresh document from Firestore and sync state
+      const snap = await getDoc(userStatusRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.likedSongIds) setLikedSongIds(data.likedSongIds);
+        if (data.recentlyPlayed) setRecentlyPlayedEntries(data.recentlyPlayed);
+      }
+      showToast("Account data synced with cloud!", "success", "fa-cloud-arrow-up");
+    } catch (err) {
+      console.error("Account sync error:", err);
+      showToast("Account sync failed", "error", "fa-triangle-exclamation");
+    } finally {
+      setIsSyncingAccount(false);
+    }
+  };
+
   const handleLogout = async () => {
+    // 1. Explicitly stop HTML5 Audio if playing
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.src = '';
+      } catch (_) {}
+    }
+
+    // 2. Explicitly stop and release Native Cordova/Capacitor Audio if playing
+    if (mediaRef.current) {
+      try { mediaRef.current.stop(); } catch (_) {}
+      try { mediaRef.current.release(); } catch (_) {}
+      mediaRef.current = null;
+    }
+
+    // 3. Reset Android MediaSession and disable background mode
+    if (Capacitor.isNativePlatform()) {
+      try { await MediaSession.setPlaybackState({ playbackState: 'paused' }); } catch (_) {}
+      try { await BackgroundMode.disable(); } catch (_) {}
+    }
+
+    // 4. Reset playback state immediately
     setIsPlaying(false);
-    // Clear this account's synced data from local state immediately so it
+    setCurrentTrack(null);
+    setTrackProgress(0);
+    setTrackDuration(0);
+    setShowFullPlayer(false);
+    initialTrackAppliedRef.current = false;
+
+    // 5. Sync this account's latest data to Firestore before signing out
+    if (user?.uid) {
+      try {
+        const userStatusRef = doc(db, 'users', user.uid);
+        await setDoc(userStatusRef, {
+          likedSongIds: likedSongIds || [],
+          recentlyPlayed: recentlyPlayedEntries || [],
+          lastPlayedTrackId: currentTrack?.id || null,
+          syncedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Sync on logout failed:', err);
+      }
+    }
+
+    // 6. Clear this account's synced data from local state immediately so it
     // doesn't flash on screen if a different account signs in on this device.
     setLikedSongIds([]);
     setRecentlyPlayedEntries([]);
-    setCurrentTrack(null);
-    initialTrackAppliedRef.current = false;
+    setPlaylists([]);
+    setPlaylistSongs([]);
+
+    // 7. Close all drawers, overlays, and modals
     setShowProfile(false);
     setShowNotifications(false);
     setShowDownloads(false);
@@ -1241,6 +1468,10 @@ export default function App() {
     setShowManageGenres(false);
     setShowManageSongs(false);
     setShowManageCanvas(false);
+    setShowAboutModal(false);
+    setShowQueueModal(false);
+
+    // 8. Sign out from Firebase
     if (Capacitor.isNativePlatform()) await FirebaseAuthentication.signOut();
     await signOut(auth);
   };
@@ -1341,15 +1572,8 @@ export default function App() {
     showToast("Profile updated successfully!", "success", "fa-circle-check");
   };
 
-  if (loading) {
-    return (
-      <div className="loading-screen-wrapper">
-        <div className="loading-container">
-          <img src={logo} className="loading-logo" alt="Loading..." />
-          <div className="loading-pulse-ring"></div>
-        </div>
-      </div>
-    );
+  if (!authResolved && !user) {
+    return <div style={{ position: 'fixed', inset: 0, backgroundColor: '#060c18' }}></div>;
   }
 
   if (!user) {
@@ -1367,8 +1591,20 @@ export default function App() {
 
   return (
     <div
-      className={`mobile-container ${increaseContrast ? 'high-contrast-mode' : ''} ${!motionEnabled ? 'disable-animations' : ''}`}
-      style={{ '--accent': appTheme }}
+      className={`mobile-container theme-mode-${currentTheme.type} ${increaseContrast ? 'high-contrast-mode' : ''} ${!motionEnabled ? 'disable-animations' : ''}`}
+      style={{
+        '--accent': currentTheme.accent,
+        '--app-bg': currentTheme.appBg,
+        '--bg-dark': currentTheme.bgDark,
+        '--bg-surface': currentTheme.bgSurface,
+        '--text-main': currentTheme.textMain,
+        '--text-muted': currentTheme.textMuted,
+        '--nav-bg': currentTheme.navBg,
+        '--mini-player-bg': currentTheme.miniPlayerBg,
+        '--header-bg': currentTheme.headerBg,
+        '--card-bg': currentTheme.cardBg,
+        '--border-subtle': currentTheme.borderSubtle
+      }}
     >
       <UpdateAvailableBanner
         updateInfo={dismissedUpdateVersion === updateInfo?.version ? null : updateInfo}
@@ -1455,6 +1691,10 @@ export default function App() {
               onToggleShuffle={toggleShuffle}
               onTogglePlay={togglePlayPause}
               onSelectTrack={handleTrackSelection}
+              onSelectArtist={(artist) => {
+                setSelectedAlbum(null);
+                setSelectedArtist(artist);
+              }}
               onBack={() => setSelectedAlbum(null)}
             />
           ) : selectedArtist ? (
@@ -1469,6 +1709,8 @@ export default function App() {
               onTogglePlay={togglePlayPause}
               onSelectTrack={handleTrackSelection}
               onSelectArtist={setSelectedArtist}
+              likedSongIds={likedSongIds}
+              onToggleLike={toggleLikeSong}
               onBack={() => setSelectedArtist(null)}
             />
           ) : selectedGenre ? (
@@ -1484,11 +1726,58 @@ export default function App() {
             />
           ) : (
             <>
+              {/* 🌟 Dynamic Greeting Header */}
+              <div className="home-greeting-container">
+                <div className="home-greeting-subtitle">
+                  <i className="fa-solid fa-sparkles"></i> Welcome to Sonara
+                </div>
+                <h1 className="home-greeting-title">
+                  {greetingText}{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}
+                </h1>
+              </div>
+
+              {/* 🌟 Quick Filter Chips */}
+              <div className="quick-filters-scroll">
+                {[
+                  { id: 'All', label: 'All', icon: 'fa-globe' },
+                  { id: 'Trending', label: 'Trending', icon: 'fa-arrow-trend-up' },
+                  { id: 'Melody', label: 'Melody', icon: 'fa-headphones' },
+                  { id: 'Party', label: 'Party', icon: 'fa-sparkles' },
+                  { id: 'Kollywood', label: 'Kollywood', icon: 'fa-fire' },
+                  { id: 'Chill', label: 'Chill', icon: 'fa-mug-hot' },
+                  { id: 'Devotional', label: 'Devotional', icon: 'fa-hands-praying' },
+                  { id: 'Love', label: 'Love', icon: 'fa-heart' }
+                ].map((chip) => (
+                  <button
+                    key={chip.id}
+                    onClick={() => {
+                      if (chip.id === 'All') {
+                        setHomeFilter('All');
+                      } else if (chip.id === 'Trending') {
+                        setHomeFilter(homeFilter === 'Trending' ? 'All' : 'Trending');
+                      } else {
+                        setSelectedGenre(chip.id);
+                      }
+                    }}
+                    className={`quick-filter-chip ${homeFilter === chip.id ? 'active' : ''}`}
+                  >
+                    <i className={`fa-solid ${chip.icon}`}></i>
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
               {/* 🌟 Recently Played Row */}
               {recentlyPlayed.length > 0 && (
-                <section className="content-section" style={{ marginBottom: '20px' }}>
+                <section className="content-section" style={{ marginBottom: '22px' }}>
                   <div className="section-header-container">
                     <h2>Recently Played</h2>
+                    <button
+                      onClick={() => handleTrackSelection(recentlyPlayed[0], recentlyPlayed)}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                    >
+                      <i className="fa-solid fa-play" style={{ fontSize: '0.72rem' }}></i> Play All
+                    </button>
                   </div>
                   <div className="horizontal-scroll">
                     {recentlyPlayed.map((song, idx) => {
@@ -1510,8 +1799,8 @@ export default function App() {
                                 position: 'absolute',
                                 bottom: '8px',
                                 right: '8px',
-                                background: 'rgba(0,0,0,0.6)',
-                                border: 'none',
+                                background: 'rgba(0,0,0,0.65)',
+                                border: '1px solid rgba(255,255,255,0.1)',
                                 borderRadius: '50%',
                                 width: '30px',
                                 height: '30px',
@@ -1534,42 +1823,40 @@ export default function App() {
                 </section>
               )}
 
-              {/* 🌟 Moods & Genres Row */}
-              <section className="content-section" style={{ marginBottom: '24px' }}>
+              {/* 🌟 Upgraded Moods & Genres Mesh Cards */}
+              <section className="content-section" style={{ marginBottom: '26px' }}>
                 <div className="section-header-container">
                   <h2>Moods & Genres</h2>
                 </div>
                 <div className="horizontal-scroll">
                   {[
-                    { name: 'Kollywood', bg: 'linear-gradient(135deg, #f43f5e, #be123c)' },
-                    { name: 'Melody', bg: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
-                    { name: 'Party', bg: 'linear-gradient(135deg, #a855f7, #6b21a8)' },
-                    { name: 'Chill', bg: 'linear-gradient(135deg, #10b981, #047857)' },
-                    { name: 'Devotional', bg: 'linear-gradient(135deg, #f59e0b, #d97706)' },
-                    { name: 'Hip Hop', bg: 'linear-gradient(135deg, #ec4899, #db2777)' },
-                    { name: 'Classical', bg: 'linear-gradient(135deg, #6366f1, #4f46e5)' },
-                    { name: 'Folk', bg: 'linear-gradient(135deg, #14b8a6, #0d9488)' },
-                    { name: 'Love', bg: 'linear-gradient(135deg, #f43f5e, #fb7185)' },
-                    { name: 'Break Heart', bg: 'linear-gradient(135deg, #475569, #1e293b)' }
+                    { name: 'Kollywood', bg: 'linear-gradient(135deg, #f43f5e 0%, #be123c 60%, #881337 100%)', icon: 'fa-fire', tag: 'Trending' },
+                    { name: 'Melody', bg: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 60%, #1e3a8a 100%)', icon: 'fa-headphones', tag: 'Vibe' },
+                    { name: 'Party', bg: 'linear-gradient(135deg, #c084fc 0%, #9333ea 60%, #581c87 100%)', icon: 'fa-compact-disc', tag: 'Dance' },
+                    { name: 'Chill', bg: 'linear-gradient(135deg, #34d399 0%, #059669 60%, #064e3b 100%)', icon: 'fa-mug-hot', tag: 'Relax' },
+                    { name: 'Love', bg: 'linear-gradient(135deg, #fb7185 0%, #e11d48 60%, #9f1239 100%)', icon: 'fa-heart', tag: 'Romance' },
+                    { name: 'Devotional', bg: 'linear-gradient(135deg, #fbbf24 0%, #d97706 60%, #78350f 100%)', icon: 'fa-hands-praying', tag: 'Peace' },
+                    { name: 'Hip Hop', bg: 'linear-gradient(135deg, #f472b6 0%, #db2777 60%, #831843 100%)', icon: 'fa-bolt', tag: 'Beats' },
+                    { name: 'Classical', bg: 'linear-gradient(135deg, #818cf8 0%, #4f46e5 60%, #312e81 100%)', icon: 'fa-music', tag: 'Acoustic' },
+                    { name: 'Folk', bg: 'linear-gradient(135deg, #2dd4bf 0%, #0d9488 60%, #134e4a 100%)', icon: 'fa-guitar', tag: 'Tradition' },
+                    { name: 'Break Heart', bg: 'linear-gradient(135deg, #94a3b8 0%, #475569 60%, #1e293b 100%)', icon: 'fa-heart-crack', tag: 'Sad' }
                   ].map((genre) => (
                     <div
                       key={genre.name}
                       onClick={() => setSelectedGenre(genre.name)}
-                      style={{
-                        minWidth: '130px', height: '84px', borderRadius: '12px', background: genre.bg,
-                        padding: '12px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column',
-                        justifyContent: 'flex-end', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
-                        flexShrink: 0
-                      }}
+                      className="genre-mesh-card"
+                      style={{ background: genre.bg }}
                     >
-                      <span style={{ color: '#fff', fontWeight: '700', fontSize: '0.9rem' }}>{genre.name}</span>
+                      <i className={`fa-solid ${genre.icon} genre-mesh-card-icon`}></i>
+                      <span className="genre-mesh-badge">{genre.tag}</span>
+                      <span className="genre-mesh-title">{genre.name}</span>
                     </div>
                   ))}
                 </div>
               </section>
 
               <SongRow
-                title="Popular Songs"
+                title={homeFilter === 'Trending' ? "Trending Hits" : "Popular Songs"}
                 songs={songs}
                 likedSongIds={likedSongIds}
                 onToggleLike={toggleLikeSong}
@@ -1725,6 +2012,8 @@ export default function App() {
         />
       )}
 
+
+
       {/* 🌟 Mini Player with Swipe Gestures */}
       <div
         onTouchStart={(e) => {
@@ -1751,6 +2040,8 @@ export default function App() {
           trackProgress={trackProgress}
           trackDuration={trackDuration}
           audioRoute={audioRoute}
+          likedSongIds={likedSongIds}
+          onToggleLike={toggleLikeSong}
           onTogglePlay={togglePlayPause}
           onNext={triggerNextTrackLogic}
           onPrev={triggerPrevTrackLogic}
@@ -1817,6 +2108,8 @@ export default function App() {
           trackDuration={trackDuration}
           lyricsSize={lyricsSize}
           audioRoute={audioRoute}
+          isLiked={Boolean(currentTrack && likedSongIds.includes(currentTrack.id))}
+          onToggleLike={(e) => toggleLikeSong(currentTrack, e)}
           onTogglePlay={togglePlayPause}
           onNext={triggerNextTrackLogic}
           onPrev={triggerPrevTrackLogic}
@@ -1836,10 +2129,14 @@ export default function App() {
         <ProfileDrawerView
           user={user}
           artists={artists}
+          playlists={playlists}
           currentVersion={CURRENT_APP_VERSION}
           updateInfo={updateInfo}
           onLogout={handleLogout}
+          onSyncAccount={handleSyncAccountData}
+          isSyncingAccount={isSyncingAccount}
           onNavigateSettings={() => setShowSettings(true)}
+          onOpenDownloads={() => setShowDownloads(true)}
           onGoToSavedArtists={() => {
             setLibraryActiveTab('artists');
             setCurrentView('library');
@@ -1853,6 +2150,8 @@ export default function App() {
           onOpenManageSongs={() => setShowManageSongs(true)}
           onOpenManageCanvas={() => setShowManageCanvas(true)}
           onUpdateProfile={handleUpdateProfile}
+          showAboutModal={showAboutModal}
+          setShowAboutModal={setShowAboutModal}
           onClose={() => setShowProfile(false)}
         />
       )}
@@ -1865,6 +2164,10 @@ export default function App() {
           updateInfo={updateInfo}
           onSelectTrack={handleTrackSelection}
           onNotificationsRead={() => updateUnreadNotificationStatus(songs)}
+          onNavigateHome={() => {
+            setCurrentView('home');
+            setShowNotifications(false);
+          }}
           onClose={() => setShowNotifications(false)}
         />
       )}
@@ -1874,22 +2177,29 @@ export default function App() {
           currentTrack={currentTrack}
           isPlaying={isPlaying}
           onSelectTrack={handleTrackSelection}
+          onTogglePlay={togglePlayPause}
           onClose={() => setShowDownloads(false)}
         />
       )}
 
       {showSettings && (
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: '#060c18', zIndex: 650, overflowY: 'auto',
-          boxSizing: 'border-box',
-          animation: 'slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)'
-        }}>
+        <div 
+          className="settings-view-wrapper set-hide-scrollbar"
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'var(--bg-dark, #05070c)', zIndex: 700, overflowY: 'auto',
+            scrollbarWidth: 'none', msOverflowStyle: 'none',
+            boxSizing: 'border-box',
+            animation: 'slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+        >
           <SettingsView
             contentRestrictions={contentRestrictions}
             setContentRestrictions={setContentRestrictions}
             appTheme={appTheme}
             setAppTheme={setAppTheme}
+            themeId={themeId}
+            onSelectTheme={handleSelectTheme}
             motionEnabled={motionEnabled}
             setMotionEnabled={setMotionEnabled}
             lyricsSize={lyricsSize}
@@ -1900,6 +2210,22 @@ export default function App() {
             setAutomaticallySendDiagnostics={setAutomaticallySendDiagnostics}
             crossfadeEnabled={crossfadeEnabled}
             setCrossfadeEnabled={setCrossfadeEnabled}
+            playbackSpeed={playbackSpeed}
+            setPlaybackSpeed={setPlaybackSpeed}
+            normalizeVolume={normalizeVolume}
+            setNormalizeVolume={setNormalizeVolume}
+            offlineOnlyMode={offlineOnlyMode}
+            setOfflineOnlyMode={setOfflineOnlyMode}
+            autoplayInfinite={autoplayInfinite}
+            setAutoplayInfinite={setAutoplayInfinite}
+            spatialAudio={spatialAudio}
+            setSpatialAudio={setSpatialAudio}
+            hapticsEnabled={hapticsEnabled}
+            setHapticsEnabled={setHapticsEnabled}
+            eqPreset={eqPreset}
+            setEqPreset={setEqPreset}
+            sleepTimeLeft={sleepTimeLeft}
+            onSetSleepTimer={setSleepTimeLeft}
             currentVersion={CURRENT_APP_VERSION}
             songs={songs}
             onBack={() => setShowSettings(false)}

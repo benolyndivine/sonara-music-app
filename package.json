@@ -1,13 +1,14 @@
 {
   "name": "sonara",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.4.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "node scripts/patch-media-session.cjs"
   },
   "dependencies": {
     "@anuradev/capacitor-background-mode": "^7.2.1",
@@ -21,11 +22,13 @@
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
     "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/share": "^8.0.1",
     "@capacitor/status-bar": "^8.0.3",
     "@capgo/capacitor-media-session": "^8.0.30",
     "@capgo/capacitor-native-audio": "^8.4.14",
     "@fortawesome/fontawesome-free": "^7.3.1",
+    "cordova-plugin-file": "^8.1.3",
     "cordova-plugin-media": "^7.0.0",
     "firebase": "^12.15.0",
     "react": "^19.2.7",

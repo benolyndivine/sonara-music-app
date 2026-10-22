@@ -129,6 +129,8 @@ export default function FullPlayerView({
   const lyricsViewActive = showLyricsSheet || lyricsInlineMode;
   useEffect(() => {
     if (!lyricsViewActive || !parsedLyrics.isSynced || activeLyricsLineIndex < 0) return;
+    const autoScrollSetting = localStorage.getItem('sonara_lyrics_autoscroll') !== 'false';
+    if (!autoScrollSetting) return;
 
     const container = lyricsScrollContainerRef.current;
     const activeEl = activeLineRef.current;
@@ -279,7 +281,7 @@ export default function FullPlayerView({
       {toastMessage && (
         <div
           style={{
-            position: 'absolute', top: '32px', left: '24px', right: '24px', zIndex: 9999,
+            position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 24px)', left: '24px', right: '24px', zIndex: 9999,
             backgroundColor: '#0d2218', border: '1px solid var(--accent)', borderRadius: '14px',
             padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px',
             boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
@@ -304,7 +306,9 @@ export default function FullPlayerView({
       <div 
         style={{
           width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
-          justifyContent: 'space-between', padding: '20px 24px', boxSizing: 'border-box'
+          justifyContent: 'space-between',
+          padding: 'calc(env(safe-area-inset-top, 0px) + 16px) 24px calc(env(safe-area-inset-bottom, 0px) + 20px)',
+          boxSizing: 'border-box'
         }}
       >
         {/* Top Header Bar with Working Controls */}
@@ -314,30 +318,47 @@ export default function FullPlayerView({
           </button>
           <button
             onClick={() => AudioRouteInfo.openBluetoothSettings().catch(() => {})}
-            title="Tap to open Bluetooth settings"
+            title="Tap to manage audio output device"
             style={{
-              background: 'none', border: 'none', cursor: 'pointer', pointerEvents: 'auto',
-              display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '60%'
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '20px',
+              padding: '6px 14px',
+              cursor: 'pointer', pointerEvents: 'auto',
+              display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '68%',
+              transition: 'all 0.15s ease'
             }}
           >
-            {getRouteLabel(audioRoute) ? (
+            {audioRoute?.connected && audioRoute?.deviceType === 'bluetooth' ? (
               <>
-                <i
-                  className={getRouteIconClass(audioRoute.deviceType)}
-                  style={{ fontSize: '0.75rem', color: audioRoute.connected ? 'var(--accent)' : 'rgba(255,255,255,0.5)' }}
-                ></i>
+                <i className="fa-brands fa-bluetooth-b" style={{ fontSize: '0.82rem', color: 'var(--accent)' }}></i>
                 <span style={{
-                  margin: 0, fontSize: '0.72rem', fontWeight: '600', letterSpacing: '0.4px',
-                  color: audioRoute.connected ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                  margin: 0, fontSize: '0.74rem', fontWeight: '700', letterSpacing: '0.3px',
+                  color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                 }}>
-                  {getRouteLabel(audioRoute)}
+                  {audioRoute.deviceName || 'Bluetooth Device'}
+                </span>
+              </>
+            ) : audioRoute?.connected && audioRoute?.deviceType === 'wired' ? (
+              <>
+                <i className="fa-solid fa-headphones" style={{ fontSize: '0.82rem', color: 'var(--accent)' }}></i>
+                <span style={{
+                  margin: 0, fontSize: '0.74rem', fontWeight: '700', letterSpacing: '0.3px',
+                  color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                }}>
+                  {audioRoute.deviceName || 'Wired Headphones'}
                 </span>
               </>
             ) : (
-              <span style={{ margin: 0, fontSize: '0.75rem', fontWeight: '600', letterSpacing: '1px', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase' }}>
-                Playing from Library
-              </span>
+              <>
+                <i className="fa-solid fa-mobile-screen" style={{ fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.7)' }}></i>
+                <span style={{
+                  margin: 0, fontSize: '0.74rem', fontWeight: '600', letterSpacing: '0.3px',
+                  color: 'rgba(255, 255, 255, 0.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                }}>
+                  Phone Speaker
+                </span>
+              </>
             )}
           </button>
           <button 

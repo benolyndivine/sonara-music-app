@@ -57,6 +57,12 @@ export default function LibraryView({
   const [activeMenuId, setActiveMenuId] = useState(null); 
   const [activeTrackMenuId, setActiveTrackMenuId] = useState(null);
 
+  // 🌟 Search & Sort States for Library & Playlist Details
+  const [librarySearch, setLibrarySearch] = useState('');
+  const [librarySort, setLibrarySort] = useState('recent'); // 'recent' | 'az' | 'count'
+  const [playlistSearch, setPlaylistSearch] = useState('');
+  const [showPlaylistSearch, setShowPlaylistSearch] = useState(false);
+
   // 🆕 Detail-view (album-style) state: per-track download status + header "•••" menu
   const [trackDownloadedMap, setTrackDownloadedMap] = useState({});
   const [showPlaylistHeaderMenu, setShowPlaylistHeaderMenu] = useState(false);
@@ -359,15 +365,41 @@ export default function LibraryView({
       }
     };
 
+    // Total playlist playtime calculation
+    const totalPlaylistDurationSec = currentPlaylistSongs.reduce((sum, s) => sum + (s.duration || 0), 0);
+    const formattedPlaylistDuration = totalPlaylistDurationSec > 0 ? (
+      totalPlaylistDurationSec >= 3600
+        ? `${Math.floor(totalPlaylistDurationSec / 3600)} hr ${Math.floor((totalPlaylistDurationSec % 3600) / 60)} min`
+        : `${Math.floor(totalPlaylistDurationSec / 60)} min`
+    ) : null;
+
+    const displayedPlaylistSongs = currentPlaylistSongs.filter((song) => {
+      if (!playlistSearch.trim()) return true;
+      const q = playlistSearch.toLowerCase();
+      return (song.title || song.name || '').toLowerCase().includes(q) || (song.artist || '').toLowerCase().includes(q);
+    });
+
     return (
-      <div className="mobile-content" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: 0, paddingBottom: '160px' }}>
-        <div style={{ padding: '0 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', padding: '14px 0 10px 0' }}>
-            <button onClick={handleCloseDetail} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}><i className="fa-solid fa-arrow-left"></i></button>
+      <div className="mobile-content" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: 0, paddingBottom: '160px', position: 'relative' }}>
+        {/* 🌟 Dynamic Ambient Backdrop Glow */}
+        <div className="ambient-backdrop-glow" style={{ '--ambient-glow-color': 'rgba(29, 185, 84, 0.32)' }}></div>
+
+        <div style={{ padding: '0 20px', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0 10px 0' }}>
+            <button onClick={handleCloseDetail} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}>
+              <i className="fa-solid fa-arrow-left"></i>
+            </button>
+            <button
+              onClick={() => setShowPlaylistSearch(!showPlaylistSearch)}
+              style={{ background: 'none', border: 'none', color: showPlaylistSearch ? 'var(--accent)' : 'rgba(255, 255, 255, 0.75)', cursor: 'pointer', fontSize: '1.15rem', padding: 0 }}
+              title="Search songs in playlist"
+            >
+              <i className="fa-solid fa-magnifying-glass"></i>
+            </button>
           </div>
 
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'center', margin: '10px 0 28px 0' }}>
-            <CachedImage src={playlistImg} alt={selectedPlaylist.playlistName} style={{ width: '220px', height: '220px', borderRadius: '12px', objectFit: 'cover', boxShadow: '0 16px 36px rgba(0,0,0,0.6)' }} />
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'center', margin: '8px 0 24px 0' }}>
+            <CachedImage src={playlistImg} alt={selectedPlaylist.playlistName} style={{ width: '220px', height: '220px', borderRadius: '14px', objectFit: 'cover', boxShadow: '0 20px 40px rgba(0,0,0,0.65)' }} />
           </div>
 
           <div style={{ marginBottom: '22px' }}>
@@ -381,23 +413,27 @@ export default function LibraryView({
                 style={{ width: '100%', boxSizing: 'border-box', margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '700', color: '#ffffff', letterSpacing: '-0.6px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--accent)', borderRadius: '8px', padding: '4px 8px', outline: 'none' }}
               />
             ) : (
-              <h2 style={{ margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '700', color: '#ffffff', letterSpacing: '-0.6px' }}>{selectedPlaylist.playlistName}</h2>
+              <h2 style={{ margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.6px' }}>{selectedPlaylist.playlistName}</h2>
             )}
-            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '500' }}>Playlist • {currentPlaylistSongs.length} tracks</p>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '500' }}>
+              Playlist • {currentPlaylistSongs.length} tracks{formattedPlaylistDuration ? ` • ${formattedPlaylistDuration}` : ''}
+            </p>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', position: 'relative' }}>
-            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', color: '#ffffff', fontSize: '1.4rem' }}>
-              <button onClick={() => handleDownloadPlaylist(selectedPlaylist)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', position: 'relative' }}>
+            <div style={{ display: 'flex', gap: '22px', alignItems: 'center', color: '#ffffff', fontSize: '1.35rem' }}>
+              <button onClick={() => handleDownloadPlaylist(selectedPlaylist)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Download entire playlist">
                 <i className={isDownloadingThisPlaylist ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"}></i>
               </button>
 
-              <button onClick={handleSharePlaylist} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>
+              <button onClick={handleSharePlaylist} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Share playlist">
                 <i className="fa-solid fa-arrow-up-from-bracket"></i>
               </button>
 
               <div style={{ position: 'relative', display: 'inline-block' }}>
-                <button onClick={() => setShowPlaylistHeaderMenu(!showPlaylistHeaderMenu)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}><i className="fa-solid fa-ellipsis-vertical"></i></button>
+                <button onClick={() => setShowPlaylistHeaderMenu(!showPlaylistHeaderMenu)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>
+                  <i className="fa-solid fa-ellipsis-vertical"></i>
+                </button>
                 {showPlaylistHeaderMenu && (
                   <div className="premium-dropdown-menu" style={{ left: '0', top: '30px', position: 'absolute', zIndex: 600 }}>
                     <button onClick={() => { setEditingName(selectedPlaylist.playlistName); setEditingPlaylistId(selectedPlaylist.id); setShowPlaylistHeaderMenu(false); }} className="dropdown-playlist-option" style={{ padding: '12px 14px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', color: '#ffffff', cursor: 'pointer', fontSize: '0.9rem' }}>Rename Playlist</button>
@@ -407,121 +443,170 @@ export default function LibraryView({
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '22px' }}>
-              <button onClick={handlePlaylistPlayClick} style={{ width: '54px', height: '54px', borderRadius: '50%', backgroundColor: 'var(--accent)', border: 'none', color: '#000000', fontSize: '1.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 6px 16px rgba(29, 185, 84, 0.35)' }}><i className={isPlaylistCurrentlyActiveAndPlaying ? "fa-solid fa-pause" : "fa-solid fa-play"} style={{ marginLeft: isPlaylistCurrentlyActiveAndPlaying ? '0' : '4px' }}></i></button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <button
+                onClick={() => {
+                  if (currentPlaylistSongs.length === 0) return;
+                  const randIdx = Math.floor(Math.random() * currentPlaylistSongs.length);
+                  onSelectTrack(currentPlaylistSongs[randIdx], currentPlaylistSongs);
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, fontSize: '1.25rem' }}
+                title="Shuffle playlist"
+              >
+                <i className="fa-solid fa-shuffle"></i>
+              </button>
+
+              <button
+                onClick={handlePlaylistPlayClick}
+                className="pulse-play-btn"
+                style={{ width: '54px', height: '54px', borderRadius: '50%', backgroundColor: 'var(--accent)', border: 'none', color: '#000000', fontSize: '1.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                title={isPlaylistCurrentlyActiveAndPlaying ? "Pause" : "Play playlist"}
+              >
+                <i className={isPlaylistCurrentlyActiveAndPlaying ? "fa-solid fa-pause" : "fa-solid fa-play"} style={{ marginLeft: isPlaylistCurrentlyActiveAndPlaying ? '0' : '4px' }}></i>
+              </button>
             </div>
           </div>
+
+          {/* 🌟 Inline Search Bar */}
+          {showPlaylistSearch && (
+            <div className="detail-inline-search-box">
+              <input
+                autoFocus
+                type="text"
+                placeholder="Filter songs in playlist..."
+                value={playlistSearch}
+                onChange={(e) => setPlaylistSearch(e.target.value)}
+                className="detail-inline-search"
+              />
+              <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <i className="fa-solid fa-magnifying-glass"></i>
+              </span>
+              {playlistSearch && (
+                <button
+                  type="button"
+                  onClick={() => setPlaylistSearch('')}
+                  style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+                >
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="songs-vertical-grid" style={{ padding: '0 10px' }}>
+        <div className="songs-vertical-grid" style={{ padding: '0 10px', position: 'relative', zIndex: 1 }}>
           {(() => {
-            // Computed once per render (not per-row): where would the
-            // dragged item land if dropped right now, given the live
-            // pointer offset. Used below to open a gap in the list that
-            // tracks the finger, iOS-reorder style.
             const rowHeight = dragMetricsRef.current.rowHeight || 64;
             const liveTargetIndex = draggedIndex !== null
-              ? Math.min(Math.max(draggedIndex + Math.round(dragOffsetY / rowHeight), 0), currentPlaylistSongs.length - 1)
+              ? Math.min(Math.max(draggedIndex + Math.round(dragOffsetY / rowHeight), 0), displayedPlaylistSongs.length - 1)
               : null;
 
-            return currentPlaylistSongs.length > 0 ? currentPlaylistSongs.map((song, index) => {
-            const songImgSrc = song.cover || song.image || song.imageUrl;
-            const songTitle = song.title || song.name;
-            const isCurrent = currentTrack && song.id === currentTrack.id;
-            const dlState = trackDownloadedMap[song.id];
-            const isBeingDragged = draggedIndex === index;
+            return displayedPlaylistSongs.length > 0 ? displayedPlaylistSongs.map((song, index) => {
+              const songImgSrc = song.cover || song.image || song.imageUrl;
+              const songTitle = song.title || song.name;
+              const isCurrent = currentTrack && song.id === currentTrack.id;
+              const dlState = trackDownloadedMap[song.id];
+              const isBeingDragged = draggedIndex === index;
 
-            // 🛠️ REWORKED DRAG VISUALS:
-            // - The picked-up row translates by the raw pointer delta, so it
-            //   travels smoothly with the finger instead of jumping row-by-row.
-            // - Every OTHER row between its original spot and the live target
-            //   slides out of the way by exactly one row height, opening a
-            //   gap where the dragged row would land if released right now.
-            // Nothing in the underlying array actually moves until drop (see
-            // handleGripPointerUp), so this is purely a live visual preview.
-            let rowTransform = 'translateY(0px)';
-            let rowTransition = 'transform 0.18s ease, background 0.15s ease';
+              let rowTransform = 'translateY(0px)';
+              let rowTransition = 'transform 0.18s ease, background 0.15s ease';
 
-            if (isBeingDragged) {
-              rowTransform = `translateY(${dragOffsetY}px) scale(1.02)`;
-              rowTransition = 'none'; // 1:1 with the finger, no easing lag
-            } else if (draggedIndex !== null && liveTargetIndex !== null) {
-              if (draggedIndex < liveTargetIndex && index > draggedIndex && index <= liveTargetIndex) {
-                rowTransform = `translateY(-${rowHeight}px)`;
-              } else if (draggedIndex > liveTargetIndex && index < draggedIndex && index >= liveTargetIndex) {
-                rowTransform = `translateY(${rowHeight}px)`;
+              if (isBeingDragged) {
+                rowTransform = `translateY(${dragOffsetY}px) scale(1.02)`;
+                rowTransition = 'none';
+              } else if (draggedIndex !== null && liveTargetIndex !== null) {
+                if (draggedIndex < liveTargetIndex && index > draggedIndex && index <= liveTargetIndex) {
+                  rowTransform = `translateY(-${rowHeight}px)`;
+                } else if (draggedIndex > liveTargetIndex && index < draggedIndex && index >= liveTargetIndex) {
+                  rowTransform = `translateY(${rowHeight}px)`;
+                }
               }
-            }
 
-            return (
-              <div
-                key={song.mappingId || song.id}
-                ref={(el) => { rowRefs.current[song.mappingId] = el; }}
-                className="song-list-item"
-                onClick={() => { if (!isDraggingRef.current) onSelectTrack(song, currentPlaylistSongs); }}
-                style={{
-                  cursor: 'pointer', background: isBeingDragged ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  position: 'relative', overflow: 'visible',
-                  boxShadow: isBeingDragged ? '0 12px 28px rgba(0,0,0,0.5)' : 'none',
-                  zIndex: isBeingDragged ? 20 : 'auto',
-                  borderRadius: isBeingDragged ? '10px' : 0,
-                  transform: rowTransform,
-                  transition: rowTransition,
-                  willChange: draggedIndex !== null ? 'transform' : 'auto',
-                }}
-              >
-                {/* ⠿ Grip handle — press and hold this to pick the row up, drag it, and drop it in a new spot */}
-                <button
-                  className="track-drag-handle"
-                  onPointerDown={(e) => handleGripPointerDown(e, index)}
-                  onPointerMove={handleGripPointerMove}
-                  onPointerUp={handleGripPointerUp}
-                  onPointerCancel={handleGripPointerUp}
-                  onClick={(e) => e.stopPropagation()}
-                  title="Drag to reorder"
+              return (
+                <div
+                  key={song.mappingId || song.id}
+                  ref={(el) => { rowRefs.current[song.mappingId] = el; }}
+                  className="song-list-item"
+                  onClick={() => { if (!isDraggingRef.current) onSelectTrack(song, currentPlaylistSongs); }}
                   style={{
-                    background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
-                    padding: '10px 6px 10px 0', cursor: isBeingDragged ? 'grabbing' : 'grab', touchAction: 'none',
-                    display: 'flex', alignItems: 'center', fontSize: '1rem',
+                    cursor: 'pointer', background: isBeingDragged ? 'rgba(255,255,255,0.08)' : isCurrent ? 'rgba(29, 185, 84, 0.08)' : 'transparent',
+                    position: 'relative', overflow: 'visible',
+                    boxShadow: isBeingDragged ? '0 12px 28px rgba(0,0,0,0.5)' : 'none',
+                    zIndex: isBeingDragged ? 20 : 'auto',
+                    borderRadius: '12px',
+                    transform: rowTransform,
+                    transition: rowTransition,
+                    willChange: draggedIndex !== null ? 'transform' : 'auto',
                   }}
                 >
-                  <i className="fa-solid fa-grip-vertical"></i>
-                </button>
+                  {/* Reorder grip (shown when not filtering) or Numbered Index */}
+                  {!playlistSearch.trim() ? (
+                    <button
+                      className="track-drag-handle"
+                      onPointerDown={(e) => handleGripPointerDown(e, index)}
+                      onPointerMove={handleGripPointerMove}
+                      onPointerUp={handleGripPointerUp}
+                      onPointerCancel={handleGripPointerUp}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Drag to reorder"
+                      style={{
+                        background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)',
+                        padding: '10px 4px 10px 0', cursor: isBeingDragged ? 'grabbing' : 'grab', touchAction: 'none',
+                        display: 'flex', alignItems: 'center', fontSize: '0.95rem',
+                      }}
+                    >
+                      <i className="fa-solid fa-grip-vertical"></i>
+                    </button>
+                  ) : null}
 
-                <div className="list-img-wrapper"><CachedImage src={songImgSrc} alt={songTitle} className="list-track-thumb" /></div>
-                <div className="list-track-details" style={{ marginLeft: '4px' }}>
-                  <h3 style={{ color: isCurrent ? 'var(--accent)' : '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {isCurrent && <div className={`playing-equalizer-container ${!isPlaying ? 'animation-paused' : ''}`}><span className="playing-equalizer-bar"></span><span className="playing-equalizer-bar"></span><span className="playing-equalizer-bar"></span><span className="playing-equalizer-bar"></span></div>}
-                    {songTitle}
-                    {dlState === true && <i className="fa-solid fa-circle-down" style={{ color: 'var(--accent)', fontSize: '0.75rem', marginLeft: '4px' }}></i>}
-                  </h3>
-                  <p>{song.artist}</p>
-                </div>
+                  <div className="track-index-num">
+                    {isCurrent && isPlaying ? (
+                      <div className="playing-equalizer-container">
+                        <span className="playing-equalizer-bar"></span>
+                        <span className="playing-equalizer-bar"></span>
+                        <span className="playing-equalizer-bar"></span>
+                        <span className="playing-equalizer-bar"></span>
+                      </div>
+                    ) : (
+                      <span>{String(index + 1).padStart(2, '0')}</span>
+                    )}
+                  </div>
 
-                <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                  <button className="track-options-btn" onClick={() => setActiveTrackMenuId(activeTrackMenuId === song.id ? null : song.id)}><i className="fa-solid fa-ellipsis-vertical"></i></button>
-                  {activeTrackMenuId === song.id && (
-                    <div className="premium-dropdown-menu" style={{ right: '10px', top: '30px', position: 'absolute', zIndex: 500 }}>
-                      <button onClick={(e) => handleDownloadPlaylistTrack(e, song)} className="dropdown-playlist-option" style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: dlState === true ? 'var(--accent)' : '#ffffff' }}>
-                        <i className={dlState === 'loading' ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-arrow-down-to-line"} style={{ color: dlState === true ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}></i>
-                        <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Track'}</span>
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onRemoveSong(selectedPlaylist.id, song); setActiveTrackMenuId(null); }}
-                        className="dropdown-playlist-option"
-                        style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: '#ff4d4d' }}
-                      >
-                        <i className="fa-solid fa-trash" style={{ color: '#ff4d4d' }}></i>
-                        <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Remove from Playlist</span>
-                      </button>
-                    </div>
-                  )}
+                  <div className="list-img-wrapper"><CachedImage src={songImgSrc} alt={songTitle} className="list-track-thumb" /></div>
+                  <div className="list-track-details" style={{ marginLeft: '4px' }}>
+                    <h3 style={{ color: isCurrent ? 'var(--accent)' : '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {songTitle}
+                      {dlState === true && <i className="fa-solid fa-circle-down" style={{ color: 'var(--accent)', fontSize: '0.75rem', marginLeft: '4px' }}></i>}
+                    </h3>
+                    <p>{song.artist}</p>
+                  </div>
+
+                  <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                    <button className="track-options-btn" onClick={() => setActiveTrackMenuId(activeTrackMenuId === song.id ? null : song.id)}><i className="fa-solid fa-ellipsis-vertical"></i></button>
+                    {activeTrackMenuId === song.id && (
+                      <div className="premium-dropdown-menu" style={{ right: '10px', top: '30px', position: 'absolute', zIndex: 500 }}>
+                        <button onClick={(e) => handleDownloadPlaylistTrack(e, song)} className="dropdown-playlist-option" style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: dlState === true ? 'var(--accent)' : '#ffffff' }}>
+                          <i className={dlState === 'loading' ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-arrow-down-to-line"} style={{ color: dlState === true ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}></i>
+                          <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Track'}</span>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onRemoveSong(selectedPlaylist.id, song); setActiveTrackMenuId(null); }}
+                          className="dropdown-playlist-option"
+                          style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: '#ff4d4d' }}
+                        >
+                          <i className="fa-solid fa-trash" style={{ color: '#ff4d4d' }}></i>
+                          <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Remove from Playlist</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              );
+            }) : (
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px', fontSize: '0.9rem' }}>
+                {playlistSearch ? `No songs match "${playlistSearch}".` : 'This playlist has no songs yet.'}
+              </p>
             );
-          }) : (
-            <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px', fontSize: '0.9rem' }}>This playlist has no songs yet.</p>
-          );
           })()}
         </div>
       </div>
@@ -550,43 +635,55 @@ export default function LibraryView({
     };
 
     return (
-      <div className="mobile-content" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: 0, paddingBottom: '160px' }}>
-        <div style={{ padding: '0 20px' }}>
+      <div className="mobile-content" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: 0, paddingBottom: '160px', position: 'relative' }}>
+        {/* 🌟 Dynamic Ambient Backdrop Glow */}
+        <div className="ambient-backdrop-glow" style={{ '--ambient-glow-color': 'rgba(29, 185, 84, 0.32)' }}></div>
+
+        <div style={{ padding: '0 20px', position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', padding: '14px 0 10px 0' }}>
-            <button onClick={() => setSelectedPlaylist(null)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}><i className="fa-solid fa-arrow-left"></i></button>
+            <button onClick={() => setSelectedPlaylist(null)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}>
+              <i className="fa-solid fa-arrow-left"></i>
+            </button>
           </div>
 
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'center', margin: '10px 0 28px 0' }}>
-            <CachedImage src={playlistImg} alt={selectedPlaylist.playlistName} style={{ width: '220px', height: '220px', borderRadius: '12px', objectFit: 'cover', boxShadow: '0 16px 36px rgba(0,0,0,0.6)' }} />
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'center', margin: '8px 0 24px 0' }}>
+            <CachedImage src={playlistImg} alt={selectedPlaylist.playlistName} style={{ width: '220px', height: '220px', borderRadius: '14px', objectFit: 'cover', boxShadow: '0 20px 40px rgba(0,0,0,0.65)' }} />
           </div>
 
           <div style={{ marginBottom: '22px' }}>
-            <h2 style={{ margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '700', color: '#ffffff', letterSpacing: '-0.6px' }}>{selectedPlaylist.playlistName}</h2>
+            <h2 style={{ margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.6px' }}>{selectedPlaylist.playlistName}</h2>
             <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '500' }}>Playlist • {cachedPlaylistSongs.length} downloaded track{cachedPlaylistSongs.length !== 1 ? 's' : ''}</p>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '24px' }}>
-            <button onClick={handlePlaylistPlayClick} disabled={cachedPlaylistSongs.length === 0} style={{ width: '54px', height: '54px', borderRadius: '50%', backgroundColor: 'var(--accent)', border: 'none', color: '#000000', fontSize: '1.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: cachedPlaylistSongs.length === 0 ? 'not-allowed' : 'pointer', opacity: cachedPlaylistSongs.length === 0 ? 0.4 : 1, boxShadow: '0 6px 16px rgba(29, 185, 84, 0.35)' }}><i className={isPlaylistCurrentlyActiveAndPlaying ? "fa-solid fa-pause" : "fa-solid fa-play"} style={{ marginLeft: isPlaylistCurrentlyActiveAndPlaying ? '0' : '4px' }}></i></button>
+            <button onClick={handlePlaylistPlayClick} disabled={cachedPlaylistSongs.length === 0} className="pulse-play-btn" style={{ width: '54px', height: '54px', borderRadius: '50%', backgroundColor: 'var(--accent)', border: 'none', color: '#000000', fontSize: '1.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: cachedPlaylistSongs.length === 0 ? 'not-allowed' : 'pointer', opacity: cachedPlaylistSongs.length === 0 ? 0.4 : 1 }}>
+              <i className={isPlaylistCurrentlyActiveAndPlaying ? "fa-solid fa-pause" : "fa-solid fa-play"} style={{ marginLeft: isPlaylistCurrentlyActiveAndPlaying ? '0' : '4px' }}></i>
+            </button>
           </div>
         </div>
 
-        <div className="songs-vertical-grid" style={{ padding: '0 10px' }}>
+        <div className="songs-vertical-grid" style={{ padding: '0 10px', position: 'relative', zIndex: 1 }}>
           {cachedPlaylistSongs.length > 0 ? (
-            cachedPlaylistSongs.map((song) => {
+            cachedPlaylistSongs.map((song, idx) => {
               const isCurrent = currentTrack && song.id === currentTrack.id;
               return (
-                <div key={song.id} className="song-list-item" onClick={() => onSelectTrack(song, cachedPlaylistSongs)} style={{ cursor: 'pointer' }}>
+                <div key={song.id} className="song-list-item" onClick={() => onSelectTrack(song, cachedPlaylistSongs)} style={{ cursor: 'pointer', background: isCurrent ? 'rgba(29, 185, 84, 0.08)' : 'transparent', borderRadius: '12px' }}>
+                  <div className="track-index-num">
+                    {isCurrent && isPlaying ? (
+                      <div className="playing-equalizer-container">
+                        <span className="playing-equalizer-bar"></span>
+                        <span className="playing-equalizer-bar"></span>
+                        <span className="playing-equalizer-bar"></span>
+                        <span className="playing-equalizer-bar"></span>
+                      </div>
+                    ) : (
+                      <span>{String(idx + 1).padStart(2, '0')}</span>
+                    )}
+                  </div>
+
                   <div className="list-img-wrapper"><CachedImage src={song.cover || song.image || song.imageUrl} className="list-track-thumb" alt="" /></div>
                   <div className="list-track-details">
                     <h3 style={{ color: isCurrent ? 'var(--accent)' : '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {isCurrent && (
-                        <div className={`playing-equalizer-container ${!isPlaying ? 'animation-paused' : ''}`}>
-                          <span className="playing-equalizer-bar"></span>
-                          <span className="playing-equalizer-bar"></span>
-                          <span className="playing-equalizer-bar"></span>
-                          <span className="playing-equalizer-bar"></span>
-                        </div>
-                      )}
                       {song.title || song.name}
                     </h3>
                     <p>{song.artist} • <span style={{ color: 'var(--accent)' }}>Saved Offline</span></p>
@@ -607,12 +704,50 @@ export default function LibraryView({
   // ─────────────────────────────────────────────────────────────
   // ROOT COMPONENT STRUCTURE SCREEN
   // ─────────────────────────────────────────────────────────────
+  const filteredPlaylists = playlists.filter(p => {
+    if (!librarySearch.trim()) return true;
+    return (p.playlistName || '').toLowerCase().includes(librarySearch.toLowerCase());
+  }).sort((a, b) => {
+    if (librarySort === 'az') return (a.playlistName || '').localeCompare(b.playlistName || '');
+    if (librarySort === 'count') {
+      const countA = getPlaylistSongsWithMapping(a.id).length;
+      const countB = getPlaylistSongsWithMapping(b.id).length;
+      return countB - countA;
+    }
+    return 0;
+  });
+
+  const filteredSavedAlbums = savedAlbums.filter(a => {
+    if (!librarySearch.trim()) return true;
+    const q = librarySearch.toLowerCase();
+    return (a.name || '').toLowerCase().includes(q) || (a.artist || '').toLowerCase().includes(q);
+  }).sort((a, b) => {
+    if (librarySort === 'az') return (a.name || '').localeCompare(b.name || '');
+    if (librarySort === 'count') return (b.trackCount || 0) - (a.trackCount || 0);
+    return 0;
+  });
+
+  const filteredSavedArtists = savedArtists.filter(a => {
+    if (!librarySearch.trim()) return true;
+    return (a.name || '').toLowerCase().includes(librarySearch.toLowerCase());
+  }).sort((a, b) => {
+    if (librarySort === 'az') return (a.name || '').localeCompare(b.name || '');
+    if (librarySort === 'count') return (b.songCount || 0) - (a.songCount || 0);
+    return 0;
+  });
+
   return (
     <div className="mobile-content">
       <div className="view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h2 className="view-title">{isOffline ? 'Downloaded Only' : 'Your Library'}</h2>
         {!isOffline && (
-          <button onClick={() => setShowCreateForm(!showCreateForm)} style={{ backgroundColor: 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>+</button>
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            style={{ backgroundColor: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '50%', width: '36px', height: '36px', color: '#ffffff', fontSize: '1.25rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Create Playlist"
+          >
+            +
+          </button>
         )}
       </div>
 
@@ -623,31 +758,68 @@ export default function LibraryView({
           onCreatePlaylist(newPlaylistName);
           setNewPlaylistName('');
           setShowCreateForm(false);
-        }} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-          <input type="text" placeholder="Playlist name..." value={newPlaylistName} onChange={(e) => setNewPlaylistName(e.target.value)} style={{ flex: 1, height: '38px', backgroundColor: '#1a2232', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '0 12px', color: '#ffffff', outline: 'none' }} />
-          <button type="submit" style={{ backgroundColor: 'var(--accent)', color: '#000000', border: 'none', borderRadius: '8px', padding: '0 16px', fontWeight: '600', cursor: 'pointer' }}>Create</button>
+        }} style={{ display: 'flex', gap: '10px', marginBottom: '20px', background: 'rgba(255,255,255,0.04)', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <input type="text" placeholder="New playlist name..." value={newPlaylistName} onChange={(e) => setNewPlaylistName(e.target.value)} style={{ flex: 1, height: '40px', backgroundColor: '#1a2232', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '0 14px', color: '#ffffff', outline: 'none', fontSize: '0.9rem' }} />
+          <button type="submit" style={{ backgroundColor: 'var(--accent)', color: '#000000', border: 'none', borderRadius: '10px', padding: '0 18px', fontWeight: '700', cursor: 'pointer', fontSize: '0.88rem' }}>Create</button>
         </form>
       )}
 
       {isOffline ? (
-        // 📴 OFFLINE: Playlists & Artists tabs are hidden — only Downloaded is reachable
-        <div className="library-tabs-container" style={{ display: 'flex', marginBottom: '24px' }}>
+        <div className="library-tabs-container" style={{ display: 'flex', marginBottom: '20px' }}>
           <button style={{ background: 'var(--accent)', color: '#000000', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '700' }}>
             📥 Downloaded
           </button>
         </div>
       ) : (
-        <div className="library-tabs-container" style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
-          <button onClick={() => setActiveTab('playlists')} style={{ background: activeTab === 'playlists' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.06)', color: activeTab === 'playlists' ? '#000000' : '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Playlists</button>
-          <button onClick={() => setActiveTab('albums')} style={{ background: activeTab === 'albums' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.06)', color: activeTab === 'albums' ? '#000000' : '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Albums</button>
-          <button onClick={() => setActiveTab('artists')} style={{ background: activeTab === 'artists' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.06)', color: activeTab === 'artists' ? '#000000' : '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Artists</button>
+        <div className="library-tabs-container" style={{ display: 'flex', gap: '10px', marginBottom: '18px' }}>
+          <button onClick={() => setActiveTab('playlists')} style={{ background: activeTab === 'playlists' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.06)', color: activeTab === 'playlists' ? '#000000' : '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Playlists ({playlists.length})</button>
+          <button onClick={() => setActiveTab('albums')} style={{ background: activeTab === 'albums' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.06)', color: activeTab === 'albums' ? '#000000' : '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Albums ({savedAlbums.length})</button>
+          <button onClick={() => setActiveTab('artists')} style={{ background: activeTab === 'artists' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.06)', color: activeTab === 'artists' ? '#000000' : '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Artists ({savedArtists.length})</button>
+        </div>
+      )}
+
+      {/* 🌟 Library Search & Sort Bar */}
+      {!isOffline && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <input
+              type="text"
+              placeholder={`Search ${activeTab}...`}
+              value={librarySearch}
+              onChange={(e) => setLibrarySearch(e.target.value)}
+              style={{
+                width: '100%', height: '38px', backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px',
+                padding: '0 32px 0 34px', color: '#ffffff', fontSize: '0.84rem', outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+            <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.8rem' }}></i>
+            {librarySearch && (
+              <i className="fa-solid fa-xmark" onClick={() => setLibrarySearch('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: '0.8rem' }}></i>
+            )}
+          </div>
+          <button
+            onClick={() => {
+              setLibrarySort(prev => prev === 'recent' ? 'az' : prev === 'az' ? 'count' : 'recent');
+            }}
+            style={{
+              height: '38px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '12px', padding: '0 12px', color: '#ffffff', fontSize: '0.78rem', fontWeight: '600',
+              display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flexShrink: 0
+            }}
+            title="Cycle sort order"
+          >
+            <i className="fa-solid fa-arrow-down-short-wide" style={{ color: 'var(--accent)' }}></i>
+            <span>{librarySort === 'az' ? 'A-Z' : librarySort === 'count' ? 'Tracks' : 'Recent'}</span>
+          </button>
         </div>
       )}
 
       <div className="library-display-panel">
         {isOffline ? (
           <>
-            {/* 📥 Downloaded playlists — playable locally with no connection */}
+            {/* 📥 Downloaded playlists */}
             {offlineAvailablePlaylists.length > 0 && (
               <div style={{ marginBottom: '28px' }}>
                 <h3 style={{ fontSize: '0.95rem', color: '#ffffff', margin: '0 0 12px 0', fontWeight: '700' }}>Downloaded Playlists</h3>
@@ -658,7 +830,7 @@ export default function LibraryView({
                       ? (cachedTracks[0].cover || cachedTracks[0].image || cachedTracks[0].imageUrl)
                       : 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=200&auto=format&fit=crop';
                     return (
-                      <div key={playlist.id} className="song-list-item" onClick={() => setSelectedPlaylist(playlist)} style={{ cursor: 'pointer' }}>
+                      <div key={playlist.id} className="song-list-item" onClick={() => setSelectedPlaylist(playlist)} style={{ cursor: 'pointer', borderRadius: '12px' }}>
                         <div className="list-img-wrapper"><CachedImage src={playlistImg} alt="" className="list-track-thumb" /></div>
                         <div className="list-track-details">
                           <h3>{playlist.playlistName}</h3>
@@ -678,7 +850,7 @@ export default function LibraryView({
                 offlineDownloadedSongs.map((song) => {
                   const isCurrent = currentTrack && song.id === currentTrack.id;
                   return (
-                    <div key={song.id} className="song-list-item" onClick={() => onSelectTrack(song, offlineDownloadedSongs)} style={{ cursor: 'pointer' }}>
+                    <div key={song.id} className="song-list-item" onClick={() => onSelectTrack(song, offlineDownloadedSongs)} style={{ cursor: 'pointer', borderRadius: '12px' }}>
                       <div className="list-img-wrapper">
                         <CachedImage src={song.cover || song.image || song.imageUrl} className="list-track-thumb" alt="" />
                       </div>
@@ -705,8 +877,8 @@ export default function LibraryView({
             </div>
           </>
         ) : activeTab === 'playlists' ? (
-          <div className="playlists-vertical-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {playlists.map((playlist) => {
+          <div className="playlists-vertical-grid" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {filteredPlaylists.map((playlist) => {
               const assignedSongs = getPlaylistSongsWithMapping(playlist.id);
               const playlistImg = assignedSongs.length > 0 
                 ? (assignedSongs[0].cover || assignedSongs[0].image || assignedSongs[0].imageUrl)
@@ -715,13 +887,15 @@ export default function LibraryView({
               const isDownloadingPlaylist = playlistDownloadStatus[playlist.id] === 'loading';
 
               return (
-                <div key={playlist.id} className="song-list-item" onClick={() => setSelectedPlaylist(playlist)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'visible' }}>
-                  <div className="list-img-wrapper">
-                    <CachedImage src={playlistImg} alt="" className="list-track-thumb" />
+                <div key={playlist.id} className="song-list-item" onClick={() => setSelectedPlaylist(playlist)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'visible', borderRadius: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="list-img-wrapper" style={{ width: '60px', height: '60px' }}>
+                    <CachedImage src={playlistImg} alt="" className="list-track-thumb" style={{ borderRadius: '10px', boxShadow: '0 4px 14px rgba(0,0,0,0.4)' }} />
                   </div>
-                  <div className="list-track-details">
-                    <h3>{playlist.playlistName}</h3>
-                    <p>Playlist • {assignedSongs.length} songs</p>
+                  <div className="list-track-details" style={{ marginLeft: '6px' }}>
+                    <h3 style={{ fontSize: '0.98rem', fontWeight: '700' }}>{playlist.playlistName}</h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Playlist • {assignedSongs.length} tracks • By you
+                    </p>
                   </div>
 
                   <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
@@ -731,7 +905,6 @@ export default function LibraryView({
 
                     {activeMenuId === playlist.id && (
                       <div className="premium-dropdown-menu" style={{ position: 'absolute', bottom: 'auto', top: '35px', right: 0, width: '180px', zIndex: 10 }}>
-                        {/* 🆕 ADDED: BATCH DOWNLOAD OPTION ROW AT PLAYLIST ROOT */}
                         <button
                           onClick={() => {
                             setActiveMenuId(null);
@@ -759,7 +932,7 @@ export default function LibraryView({
                             if (window.confirm(`Delete playlist "${playlist.playlistName}" completely?`)) {
                               onDeletePlaylist(playlist.id);
                             }
-                              setActiveMenuId(null);
+                            setActiveMenuId(null);
                           }}
                           style={{ padding: '10px', background: 'none', border: 'none', color: '#ff4d4d', width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}
                         >
@@ -771,25 +944,32 @@ export default function LibraryView({
                 </div>
               );
             })}
+            {filteredPlaylists.length === 0 && (
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px 0', fontSize: '0.9rem' }}>
+                {librarySearch ? `No playlists match "${librarySearch}".` : 'No playlists yet. Tap + to create one!'}
+              </p>
+            )}
           </div>
         ) : activeTab === 'albums' ? (
-          <div className="albums-vertical-list" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {savedAlbums.length > 0 ? (
-              savedAlbums.map((album) => (
+          <div className="albums-vertical-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {filteredSavedAlbums.length > 0 ? (
+              filteredSavedAlbums.map((album) => (
                 <div
                   key={album.id}
                   className="song-list-item"
                   onClick={() => onSelectAlbum && onSelectAlbum(album)}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', borderRadius: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
                 >
-                  <div className="list-img-wrapper">
-                    <CachedImage src={album.image} alt={album.name} className="list-track-thumb" />
+                  <div className="list-img-wrapper" style={{ width: '60px', height: '60px' }}>
+                    <CachedImage src={album.image} alt={album.name} className="list-track-thumb" style={{ borderRadius: '10px' }} />
                   </div>
-                  <div className="list-track-details">
-                    <h3 style={{ color: '#ffffff' }}>{album.name}</h3>
-                    <p>Album • {album.artist} • {album.trackCount} {album.trackCount === 1 ? 'track' : 'tracks'}</p>
+                  <div className="list-track-details" style={{ marginLeft: '6px' }}>
+                    <h3 style={{ color: '#ffffff', fontSize: '0.96rem', fontWeight: '700' }}>{album.name}</h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Album • {album.artist} • {album.trackCount} {album.trackCount === 1 ? 'track' : 'tracks'}
+                    </p>
                   </div>
-                  <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginRight: '6px' }}></i>
+                  <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginRight: '8px' }}></i>
                 </div>
               ))
             ) : (
@@ -797,22 +977,22 @@ export default function LibraryView({
                 <i className="fa-solid fa-compact-disc" style={{ fontSize: '2.2rem', color: 'var(--text-muted)', marginBottom: '16px' }}></i>
                 <h3 style={{ color: '#ffffff', margin: '0 0 8px 0', fontSize: '1rem' }}>No Saved Albums</h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, maxWidth: '260px' }}>
-                  Open an album and tap the ✓ button to save it here.
+                  {librarySearch ? `No albums match "${librarySearch}".` : 'Open an album and tap the ✓ button to save it here.'}
                 </p>
               </div>
             )}
           </div>
         ) : (
-          <div className="artists-vertical-list" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {savedArtists.length > 0 ? (
-              savedArtists.map((artist) => (
+          <div className="artists-vertical-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {filteredSavedArtists.length > 0 ? (
+              filteredSavedArtists.map((artist) => (
                 <div
                   key={artist.id}
                   className="song-list-item"
                   onClick={() => onSelectArtist && onSelectArtist(artist)}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', borderRadius: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
                 >
-                  <div className="list-img-wrapper">
+                  <div className="list-img-wrapper" style={{ width: '60px', height: '60px' }}>
                     {artist.image ? (
                       <CachedImage src={artist.image} alt={artist.name} className="list-track-thumb" style={{ borderRadius: '50%' }} />
                     ) : (
@@ -821,18 +1001,20 @@ export default function LibraryView({
                         style={{
                           borderRadius: '50%', backgroundColor: 'var(--accent)', color: '#000',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: '700', fontSize: '1.1rem'
+                          fontWeight: '700', fontSize: '1.2rem'
                         }}
                       >
                         {(artist.name || '?').charAt(0).toUpperCase()}
                       </div>
                     )}
                   </div>
-                  <div className="list-track-details">
-                    <h3 style={{ color: '#ffffff' }}>{artist.name}</h3>
-                    <p>Artist • {artist.songCount} {artist.songCount === 1 ? 'song' : 'songs'}</p>
+                  <div className="list-track-details" style={{ marginLeft: '6px' }}>
+                    <h3 style={{ color: '#ffffff', fontSize: '0.96rem', fontWeight: '700' }}>{artist.name}</h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Artist • {artist.songCount} {artist.songCount === 1 ? 'song' : 'songs'}
+                    </p>
                   </div>
-                  <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginRight: '6px' }}></i>
+                  <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginRight: '8px' }}></i>
                 </div>
               ))
             ) : (
@@ -840,7 +1022,7 @@ export default function LibraryView({
                 <i className="fa-solid fa-user-large" style={{ fontSize: '2.2rem', color: 'var(--text-muted)', marginBottom: '16px' }}></i>
                 <h3 style={{ color: '#ffffff', margin: '0 0 8px 0', fontSize: '1rem' }}>No Saved Artists</h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, maxWidth: '260px' }}>
-                  Open an artist's profile and tap the ✓ button to save them here.
+                  {librarySearch ? `No artists match "${librarySearch}".` : "Open an artist's profile and tap the ✓ button to save them here."}
                 </p>
               </div>
             )}

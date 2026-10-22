@@ -1,4 +1,5 @@
 import React from 'react';
+import { CURRENT_APP_VERSION, isNewerVersion } from '../utils/updateService';
 
 /**
  * UpdateAvailableBanner
@@ -13,8 +14,8 @@ import React from 'react';
  * your view-switching logic so it's visible no matter which screen the
  * user is on (except maybe skip it while FullPlayerView is open, your call).
  */
-export default function UpdateAvailableBanner({ updateInfo, currentVersion, onDismiss }) {
-  if (!updateInfo || !updateInfo.version || updateInfo.version === currentVersion) return null;
+export default function UpdateAvailableBanner({ updateInfo, currentVersion = CURRENT_APP_VERSION, onDismiss }) {
+  if (!updateInfo || !updateInfo.version || !isNewerVersion(updateInfo.version, currentVersion)) return null;
 
   const handleUpdateClick = () => {
     if (updateInfo.url) window.open(updateInfo.url, '_blank');

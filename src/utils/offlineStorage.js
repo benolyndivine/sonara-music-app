@@ -329,7 +329,7 @@ export function getPlaybackSource(song) {
 
   const remoteUrl = song.songUrl || song.audioUrl;
   if (!remoteUrl) return null;
-  return appendQualityParam(remoteUrl, getStreamingQuality());
+  return remoteUrl;
 }
 
 /**

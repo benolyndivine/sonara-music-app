@@ -33,6 +33,16 @@
             android:name="com.getcapacitor.plugin.background.BackgroundService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="false" />
+        <service
+            android:name="com.capgo.mediasession.MediaSessionService"
+            android:enabled="true"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback"
+            android:stopWithTask="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </service>
     </application>
 
     <!-- Permissions -->

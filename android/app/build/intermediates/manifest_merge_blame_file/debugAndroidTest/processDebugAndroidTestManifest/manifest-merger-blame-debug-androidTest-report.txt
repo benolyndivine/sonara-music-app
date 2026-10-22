@@ -3,24 +3,24 @@
 3    package="com.sonara.app.test" >
 4
 5    <uses-sdk
-5-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:5:5-74
+5-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:5:5-74
 6        android:minSdkVersion="24"
-6-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:5:15-41
+6-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:5:15-41
 7        android:targetSdkVersion="36" />
-7-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:5:42-71
+7-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:5:42-71
 8
 9    <instrumentation
-9-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:11:5-15:64
+9-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:11:5-15:64
 10        android:name="androidx.test.runner.AndroidJUnitRunner"
-10-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:11:22-76
+10-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:11:22-76
 11        android:functionalTest="false"
-11-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:14:22-52
+11-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:14:22-52
 12        android:handleProfiling="false"
-12-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:13:22-53
+12-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:13:22-53
 13        android:label="Tests for com.sonara.app"
-13-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:15:22-62
+13-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:15:22-62
 14        android:targetPackage="com.sonara.app" />
-14-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:12:22-60
+14-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:12:22-60
 15
 16    <queries>
 16-->[androidx.test:runner:1.7.0] C:\Users\benol\.gradle\caches\8.14.3\transforms\9c5af2fdde1f8fad4729392848167073\transformed\runner-1.7.0\AndroidManifest.xml:24:5-28:15
@@ -40,12 +40,12 @@
 22-->[androidx.test:core:1.7.0] C:\Users\benol\.gradle\caches\8.14.3\transforms\f3c8c5ab594c56ca9009b89515fbb52f\transformed\core-1.7.0\AndroidManifest.xml:24:22-69
 23
 24    <application
-24-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:7:5-9:19
+24-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:7:5-9:19
 25        android:debuggable="true"
 26        android:extractNativeLibs="false" >
 27        <uses-library android:name="android.test.runner" />
-27-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:8:9-60
-27-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest1839576534451243098.xml:8:23-57
+27-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:8:9-60
+27-->C:\Developer\Sonara\android\app\build\intermediates\tmp\manifest\androidTest\debug\tempFile1ProcessTestManifest7525089430303929644.xml:8:23-57
 28
 29        <activity
 29-->[androidx.test:core:1.7.0] C:\Users\benol\.gradle\caches\8.14.3\transforms\f3c8c5ab594c56ca9009b89515fbb52f\transformed\core-1.7.0\AndroidManifest.xml:27:9-34:20

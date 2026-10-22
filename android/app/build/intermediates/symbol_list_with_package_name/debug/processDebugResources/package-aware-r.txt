@@ -908,6 +908,7 @@ drawable ic_notification
 drawable ic_other_sign_in
 drawable ic_passkey
 drawable ic_password
+drawable ic_transparent
 drawable icon_background
 drawable media3_icon_album
 drawable media3_icon_artist
@@ -2014,3 +2015,4 @@ styleable ViewStubCompat android_id android_layout android_inflatedId
 xml config
 xml file_paths
 xml image_share_filepaths
+xml localnotifications_provider_paths

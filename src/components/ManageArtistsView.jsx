@@ -78,7 +78,8 @@ export default function ManageArtistsView({ artists = [], onBack, onArtistCreate
       className="mart-hide-scrollbar"
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: '#05070c', zIndex: 650, padding: '24px 20px 48px',
+        backgroundColor: '#05070c', zIndex: 650,
+        padding: 'calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 48px)',
         display: 'flex', flexDirection: 'column', boxSizing: 'border-box', overflowY: 'auto',
         animation: 'slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)'
       }}
@@ -86,9 +87,9 @@ export default function ManageArtistsView({ artists = [], onBack, onArtistCreate
       <style>{manageArtistStyles}</style>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, position: 'relative', zIndex: 1 }}>
         <button onClick={onBack} className="mart-icon-btn" style={iconBtnStyle}>
-          <i className="fa-solid fa-chevron-left"></i>
+          <i className="fa-solid fa-arrow-left"></i>
         </button>
         <div style={{ textAlign: 'center' }}>
           <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.3px' }}>
