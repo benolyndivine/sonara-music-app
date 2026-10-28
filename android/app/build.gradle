@@ -52,3 +52,20 @@ try {
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }
+
+// Automatically sync generated APK into the standard project folder (android/app/build/outputs/apk/debug)
+tasks.register('copyDebugApkToProject') {
+    doLast {
+        def apkDir = new File(project.layout.buildDirectory.get().asFile, "outputs/apk/debug")
+        def destDir = new File(projectDir, "build/outputs/apk/debug")
+        if (apkDir.exists()) {
+            destDir.mkdirs()
+            fileTree(apkDir).matching { include "*.apk" }.each { file ->
+                new File(destDir, file.name).bytes = file.bytes
+            }
+        }
+    }
+}
+tasks.matching { it.name in ['assembleDebug', 'packageDebug'] }.configureEach {
+    finalizedBy 'copyDebugApkToProject'
+}
