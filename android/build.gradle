@@ -20,8 +20,13 @@ allprojects {
         google()
         mavenCentral()
     }
+
+    // Redirect build outputs outside of OneDrive to eliminate Windows/OneDrive file locking locks
+    def externalBuildDir = new File(System.getProperty("user.home"), ".gradle-builds/${rootProject.name}")
+    def relativePath = project.path == ':' ? 'root' : project.path.replace(':', '/')
+    layout.buildDirectory.set(new File(externalBuildDir, relativePath))
 }
 
 task clean(type: Delete) {
-    delete rootProject.buildDir
+    delete rootProject.layout.buildDirectory
 }

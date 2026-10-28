@@ -1,7 +1,0 @@
-com.sonara.app.test.app-androidTest-0 C:\Developer\Sonara\android\app\build\generated\res\resValues\androidTest\debug
-com.sonara.app.test.app-updated_navigation_xml-1 C:\Developer\Sonara\android\app\build\generated\updated_navigation_xml\debugAndroidTest
-com.sonara.app.test.app-mergeDebugAndroidTestResources-2 C:\Developer\Sonara\android\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
-com.sonara.app.test.app-mergeDebugAndroidTestResources-3 C:\Developer\Sonara\android\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
-com.sonara.app.test.app-debugAndroidTest-4 C:\Developer\Sonara\android\app\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources
-com.sonara.app.test.app-tracing-1.2.0-5 C:\Users\benol\.gradle\caches\8.14.3\transforms\dcfd9b438b7b1dc562c63a5efe9cf4a0\transformed\tracing-1.2.0\res
-com.sonara.app.test.app-core-1.7.0-6 C:\Users\benol\.gradle\caches\8.14.3\transforms\f3c8c5ab594c56ca9009b89515fbb52f\transformed\core-1.7.0\res

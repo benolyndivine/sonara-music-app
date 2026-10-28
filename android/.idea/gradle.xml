@@ -19,6 +19,7 @@
             <option value="$PROJECT_DIR$/../node_modules/@capacitor/android/capacitor" />
             <option value="$PROJECT_DIR$/../node_modules/@capacitor/app/android" />
             <option value="$PROJECT_DIR$/../node_modules/@capacitor/filesystem/android" />
+            <option value="$PROJECT_DIR$/../node_modules/@capacitor/local-notifications/android" />
             <option value="$PROJECT_DIR$/../node_modules/@capacitor/share/android" />
             <option value="$PROJECT_DIR$/../node_modules/@capacitor/status-bar/android" />
             <option value="$PROJECT_DIR$/../node_modules/@capgo/capacitor-media-session/android" />

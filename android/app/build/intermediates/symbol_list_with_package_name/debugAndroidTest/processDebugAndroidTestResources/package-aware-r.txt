@@ -1,3 +1,0 @@
-com.sonara.app.test
-style WhiteBackgroundDialogTheme
-style WhiteBackgroundTheme

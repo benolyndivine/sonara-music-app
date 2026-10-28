@@ -1,1 +1,16 @@
-node_modules
+node_modules/
+dist/
+
+# Android build and caches
+.gradle/
+**/build/
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+*.iml
+.idea/
+local.properties
+.DS_Store
+*.class
+Thumbs.db
