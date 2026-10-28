@@ -2254,4 +2254,799 @@ a {
 
 
 
-
+
+
+/* 🎛️ Equalizer Graph & Audio Processing Engine */
+.eq-graph-card {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.eq-graph-svg {
+  width: 100%;
+  height: 140px;
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.eq-faders-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 0 4px;
+}
+
+.eq-fader-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.eq-fader-input {
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  writing-mode: bt-lr;
+  width: 26px;
+  height: 110px;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.eq-fader-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.eq-fader-input:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+.dolby-atmos-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+
+/* 🏝️ Origin Island Dynamic Capsule (Vivo OriginOS & Android Notch HUD) */
+.origin-island-container {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9995;
+  background: rgba(10, 14, 20, 0.94);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.75), 0 0 16px rgba(29, 185, 84, 0.18);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  user-select: none;
+  cursor: pointer;
+}
+
+.origin-island-compact {
+  width: 210px;
+  height: 38px;
+  border-radius: 20px;
+  padding: 4px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.origin-island-expanded {
+  width: min(348px, calc(100vw - 28px));
+  border-radius: 26px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.88), 0 0 24px rgba(29, 185, 84, 0.28);
+}
+
+.origin-island-disc {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 0 8px rgba(29, 185, 84, 0.4);
+}
+
+.origin-island-spin {
+  animation: islandDiscSpin 6s linear infinite;
+}
+
+@keyframes islandDiscSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.origin-island-wave {
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 14px;
+}
+
+.origin-island-bar {
+  width: 2.5px;
+  border-radius: 2px;
+  background-color: var(--accent);
+}
+
+.origin-island-wave-playing .origin-island-bar:nth-child(1) {
+  animation: islandWave 0.8s ease-in-out infinite alternate;
+}
+.origin-island-wave-playing .origin-island-bar:nth-child(2) {
+  animation: islandWave 1.1s ease-in-out 0.2s infinite alternate;
+}
+.origin-island-wave-playing .origin-island-bar:nth-child(3) {
+  animation: islandWave 0.9s ease-in-out 0.4s infinite alternate;
+}
+.origin-island-wave-playing .origin-island-bar:nth-child(4) {
+  animation: islandWave 1.2s ease-in-out 0.1s infinite alternate;
+}
+
+@keyframes islandWave {
+  0% { height: 3px; opacity: 0.5; }
+  100% { height: 13px; opacity: 1; }
+}
+
+/* ==========================================================================
+   24. PLAYLIST CREATOR & 3-DOT ACTION SHEET DIALOGS (SONARA PREMIUM UI)
+   ========================================================================== */
+
+.sonara-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background-color: rgba(5, 8, 14, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: sonaraFadeIn 0.22s ease-out;
+}
+
+@keyframes sonaraFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sonaraSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes sonaraPopIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.sonara-modal-sheet {
+  width: 100%;
+  max-width: 540px;
+  max-height: 88vh;
+  background: linear-gradient(180deg, #161e2e 0%, #0d121c 100%);
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  animation: sonaraSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.sheet-drag-handle {
+  width: 44px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 12px auto 4px auto;
+  flex-shrink: 0;
+}
+
+.sonara-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 10px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.sonara-modal-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  color: rgba(255, 255, 255, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sonara-modal-close-btn:active {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(0.92);
+}
+
+.sonara-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Playlist Creator Artwork Preview */
+.playlist-creator-art-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+}
+
+.playlist-art-gradient {
+  width: 68px;
+  height: 68px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1db954 0%, #0e73a3 50%, #6f42c1 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 1.6rem;
+  box-shadow: 0 8px 20px rgba(29, 185, 84, 0.25);
+  flex-shrink: 0;
+}
+
+.playlist-art-meta h4 {
+  margin: 0 0 4px 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.playlist-art-meta p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Creator Text Input */
+.creator-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.creator-input-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--accent);
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+
+.creator-text-input {
+  width: 100%;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 0 40px 0 42px;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.creator-text-input:focus {
+  border-color: var(--accent);
+  background: rgba(29, 185, 84, 0.05);
+  box-shadow: 0 0 16px rgba(29, 185, 84, 0.2);
+}
+
+.creator-clear-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 6px;
+}
+
+/* Creator Songs Section */
+.creator-songs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.creator-songs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.creator-clear-selection-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.creator-songs-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.creator-songs-search i.fa-magnifying-glass {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  pointer-events: none;
+}
+
+.creator-songs-search input {
+  width: 100%;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0 32px 0 34px;
+  color: #ffffff;
+  font-size: 0.85rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.creator-songs-search input:focus {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.creator-songs-search i.fa-xmark {
+  position: absolute;
+  right: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.creator-songs-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 4px;
+}
+
+.creator-song-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.creator-song-row:active {
+  transform: scale(0.98);
+}
+
+.creator-song-row.selected {
+  background: rgba(29, 185, 84, 0.08);
+  border-color: rgba(29, 185, 84, 0.3);
+}
+
+.creator-song-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.creator-song-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.creator-song-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creator-song-artist {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creator-checkbox {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.creator-checkbox.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000000;
+  font-size: 0.75rem;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(29, 185, 84, 0.4);
+}
+
+/* Modal Footer Buttons */
+.sonara-modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 14px 20px 24px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  background: rgba(13, 18, 28, 0.95);
+}
+
+.sonara-modal-cancel-btn {
+  flex: 1;
+  height: 46px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.sonara-modal-cancel-btn:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sonara-modal-primary-btn {
+  flex: 2;
+  height: 46px;
+  background: var(--accent);
+  border: none;
+  border-radius: 14px;
+  color: #000000;
+  font-size: 0.92rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 16px rgba(29, 185, 84, 0.3);
+}
+
+.sonara-modal-primary-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.sonara-modal-primary-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* ==========================================================================
+   25. REDESIGNED PLAYLIST 3-DOT ACTION SHEET (BOTTOM SHEET DIALOG)
+   ========================================================================== */
+
+.sonara-action-sheet {
+  width: 100%;
+  max-width: 540px;
+  background: linear-gradient(180deg, #182234 0%, #0d121c 100%);
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  animation: sonaraSlideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.action-sheet-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.action-sheet-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+}
+
+.action-sheet-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.action-sheet-meta h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-sheet-meta p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.action-sheet-close-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.action-sheet-options {
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.action-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.action-sheet-row:active {
+  background: rgba(255, 255, 255, 0.06);
+  transform: scale(0.99);
+}
+
+.action-icon-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.action-icon-circle.accent {
+  background: rgba(29, 185, 84, 0.15);
+  color: var(--accent);
+}
+
+.action-icon-circle.purple {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+}
+
+.action-icon-circle.green {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+.action-icon-circle.blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.action-icon-circle.orange {
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+}
+
+.action-icon-circle.teal {
+  background: rgba(20, 184, 166, 0.15);
+  color: #2dd4bf;
+}
+
+.action-icon-circle.red {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.action-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.action-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+
+.action-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.action-chevron {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.8rem;
+}
+
+.action-sheet-footer {
+  padding: 10px 16px 20px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.action-sheet-dismiss-btn {
+  width: 100%;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.action-sheet-dismiss-btn:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ==========================================================================
+   26. ADD SONGS PICKER & RENAME DIALOGS
+   ========================================================================== */
+
+.already-added-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(29, 185, 84, 0.12);
+  border: 1px solid rgba(29, 185, 84, 0.25);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.add-to-playlist-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 6px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.add-to-playlist-btn:active {
+  background: var(--accent);
+  color: #000;
+  transform: scale(0.95);
+}
+
+.rename-modal-container {
+  width: 90%;
+  max-width: 420px;
+  background: linear-gradient(180deg, #192336 0%, #0d121c 100%);
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  animation: sonaraPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  box-sizing: border-box;
+}

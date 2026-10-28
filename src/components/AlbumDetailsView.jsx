@@ -1,17 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { downloadTrackToDevice, isTrackCachedOffline } from '../utils/offlineStorage';
 import { isAlbumSaved, setAlbumSaved } from '../utils/savedAlbums';
+import { triggerHaptic } from '../utils/audioEffects';
 import CachedImage from './CachedImage';
 
-export default function AlbumDetailsView({ album, songs, artists, currentTrack, isPlaying, isShuffle, onToggleShuffle, onTogglePlay, onSelectTrack, onSelectArtist, onBack }) {
+export default function AlbumDetailsView({ 
+  album, 
+  songs, 
+  artists = [], 
+  currentTrack, 
+  isPlaying, 
+  isShuffle, 
+  onToggleShuffle, 
+  onTogglePlay, 
+  onSelectTrack, 
+  onSelectArtist, 
+  onBack, 
+  onOpenSongMenu,
+  onAddToQueue,
+  onPlayNext,
+  playlists = [],
+  onAddSongToPlaylist
+}) {
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
   const [downloadedMap, setDownloadedMap] = useState({});
   const [batchDownloading, setBatchDownloading] = useState(false);
   const [isSavedInLibrary, setIsSavedInLibrary] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+
+  useEffect(() => {
+    if (!showHeaderMenu && !showSearch) return;
+    const handleAlbumSubBack = (e) => {
+      e.preventDefault();
+      if (showHeaderMenu) {
+        if (showPlaylistPicker) {
+          setShowPlaylistPicker(false);
+        } else {
+          setShowHeaderMenu(false);
+        }
+      } else if (showSearch) {
+        setShowSearch(false);
+      }
+    };
+    window.addEventListener('sonara_back_press', handleAlbumSubBack);
+    return () => window.removeEventListener('sonara_back_press', handleAlbumSubBack);
+  }, [showHeaderMenu, showSearch, showPlaylistPicker]);
 
   const albumTracks = songs.filter(song => song.albumId === album.id);
 
@@ -111,6 +148,7 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
   const matchingArtistData = artists?.find(a => (a.name || '').toLowerCase() === (album.artist || '').toLowerCase());
   const artistProfileImg = matchingArtistData?.image;
   const isAlbumCurrentlyActiveAndPlaying = isPlaying && albumTracks.some(track => currentTrack && track.id === currentTrack.id);
+  const isAllDownloaded = albumTracks.length > 0 && albumTracks.every(s => downloadedMap[s.id] === true);
 
   // Total duration calculation
   const totalDurationSec = albumTracks.reduce((sum, s) => sum + (s.duration || 0), 0);
@@ -196,17 +234,17 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
               <i className="fa-solid fa-arrow-up-from-bracket"></i>
             </button>
 
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <button onClick={() => setShowHeaderMenu(!showHeaderMenu)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>
-                <i className="fa-solid fa-ellipsis-vertical"></i>
-              </button>
-              {showHeaderMenu && (
-                <div className="premium-dropdown-menu" style={{ left: '0', top: '30px', position: 'absolute', zIndex: 600 }}>
-                  <button onClick={() => { displayToast(`Added album "${album.name}" to queue.`); setShowHeaderMenu(false); }} className="dropdown-playlist-option" style={{ padding: '12px 14px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', color: '#ffffff', cursor: 'pointer', fontSize: '0.9rem' }}>Add to queue</button>
-                  <button onClick={() => { displayToast("Reporting content parameters to servers."); setShowHeaderMenu(false); }} className="dropdown-playlist-option" style={{ padding: '12px 14px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', color: '#ff4d4d', cursor: 'pointer', fontSize: '0.9rem' }}>Report Explicit Art</button>
-                </div>
-              )}
-            </div>
+            <button 
+              onClick={() => {
+                triggerHaptic(15);
+                setShowPlaylistPicker(false);
+                setShowHeaderMenu(true);
+              }} 
+              style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+              title="Album options"
+            >
+              <i className="fa-solid fa-ellipsis-vertical"></i>
+            </button>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
@@ -287,17 +325,13 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
               </div>
 
               <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                <button className="track-options-btn" onClick={() => setActiveMenuId(activeMenuId === song.id ? null : song.id)}>
+                <button
+                  className="track-options-btn"
+                  onClick={() => onOpenSongMenu ? onOpenSongMenu(song) : setActiveMenuId(activeMenuId === song.id ? null : song.id)}
+                  title="Track options"
+                >
                   <i className="fa-solid fa-ellipsis-vertical"></i>
                 </button>
-                {activeMenuId === song.id && (
-                  <div className="premium-dropdown-menu" style={{ right: '10px', top: '30px', position: 'absolute', zIndex: 500 }}>
-                    <button onClick={(e) => handleDownloadTrack(e, song)} className="dropdown-playlist-option" style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: dlState === true ? 'var(--accent)' : '#ffffff' }}>
-                      <i className={dlState === 'loading' ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"} style={{ color: dlState === true ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}></i>
-                      <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Track'}</span>
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           );
@@ -306,6 +340,258 @@ export default function AlbumDetailsView({ album, songs, artists, currentTrack, 
           <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px 0', fontSize: '0.9rem' }}>No tracks match "{searchQuery}".</p>
         )}
       </div>
+
+      {/* 🌟 Modern Album Action Bottom Sheet */}
+      {showHeaderMenu && (
+        <div className="sonara-modal-backdrop" onClick={() => { setShowHeaderMenu(false); setShowPlaylistPicker(false); }}>
+          <div className="sonara-action-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-drag-handle"></div>
+
+            {/* Album Header Preview Card */}
+            <div className="action-sheet-header">
+              <CachedImage src={album.image} alt={album.name} className="action-sheet-thumb" />
+              <div className="action-sheet-meta">
+                <h3>{album.name}</h3>
+                <p>{album.artist} • {album.year || '2026'} • {albumTracks.length} tracks{formattedTotalDuration ? ` • ${formattedTotalDuration}` : ''}</p>
+              </div>
+              <button 
+                className="action-sheet-close-btn" 
+                onClick={() => { setShowHeaderMenu(false); setShowPlaylistPicker(false); }}
+                title="Close"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            {/* Options List or Playlist Picker */}
+            {showPlaylistPicker ? (
+              <div className="action-sheet-options">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 4px 14px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '8px' }}>
+                  <button 
+                    onClick={() => setShowPlaylistPicker(false)}
+                    style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Back to options"
+                  >
+                    <i className="fa-solid fa-arrow-left"></i>
+                  </button>
+                  <div>
+                    <h4 style={{ margin: 0, color: '#fff', fontSize: '1rem', fontWeight: '800' }}>Add Album to Playlist</h4>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Choose which playlist to append all {albumTracks.length} tracks</p>
+                  </div>
+                </div>
+
+                {playlists && playlists.length > 0 ? (
+                  playlists.map(pl => (
+                    <button
+                      key={pl.id}
+                      className="action-sheet-row"
+                      onClick={() => {
+                        triggerHaptic(20);
+                        if (onAddSongToPlaylist && albumTracks.length > 0) {
+                          albumTracks.forEach(tr => onAddSongToPlaylist(pl.id, tr));
+                        }
+                        displayToast(`Added ${albumTracks.length} tracks to "${pl.playlistName}"`);
+                        setShowPlaylistPicker(false);
+                        setShowHeaderMenu(false);
+                      }}
+                    >
+                      <div className="action-icon-circle orange">
+                        <i className="fa-solid fa-music"></i>
+                      </div>
+                      <div className="action-text">
+                        <div className="action-title">{pl.playlistName}</div>
+                        <div className="action-sub">Tap to append all tracks</div>
+                      </div>
+                      <i className="fa-solid fa-plus action-chevron" style={{ color: 'var(--accent)' }}></i>
+                    </button>
+                  ))
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '30px 16px', color: 'var(--text-muted)' }}>
+                    <i className="fa-solid fa-compact-disc" style={{ fontSize: '2rem', marginBottom: '8px', opacity: 0.4 }}></i>
+                    <p style={{ margin: 0, fontSize: '0.85rem' }}>No playlists found in your library.</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="action-sheet-options">
+                {/* 1. Play Next */}
+                <button
+                  className="action-sheet-row"
+                  onClick={() => {
+                    triggerHaptic(20);
+                    if (onPlayNext && albumTracks.length > 0) {
+                      onPlayNext(albumTracks);
+                    } else {
+                      displayToast(`Added "${album.name}" to play next.`);
+                    }
+                    setShowHeaderMenu(false);
+                  }}
+                >
+                  <div className="action-icon-circle purple">
+                    <i className="fa-solid fa-forward-step"></i>
+                  </div>
+                  <div className="action-text">
+                    <div className="action-title">Play Next</div>
+                    <div className="action-sub">Queue all {albumTracks.length} tracks right after current song</div>
+                  </div>
+                </button>
+
+                {/* 2. Add to Queue */}
+                <button
+                  className="action-sheet-row"
+                  onClick={() => {
+                    triggerHaptic(20);
+                    if (onAddToQueue && albumTracks.length > 0) {
+                      onAddToQueue(albumTracks);
+                    } else {
+                      displayToast(`Added "${album.name}" to queue.`);
+                    }
+                    setShowHeaderMenu(false);
+                  }}
+                >
+                  <div className="action-icon-circle blue">
+                    <i className="fa-solid fa-layer-group"></i>
+                  </div>
+                  <div className="action-text">
+                    <div className="action-title">Add to Queue</div>
+                    <div className="action-sub">Append {albumTracks.length} tracks to Up Next list</div>
+                  </div>
+                </button>
+
+                {/* 3. Save to Library */}
+                <button
+                  className="action-sheet-row"
+                  onClick={() => {
+                    triggerHaptic(20);
+                    handleToggleSaveLibrary();
+                    setShowHeaderMenu(false);
+                  }}
+                >
+                  <div className={`action-icon-circle ${isSavedInLibrary ? 'accent' : 'green'}`}>
+                    <i className={isSavedInLibrary ? "fa-solid fa-circle-check" : "fa-regular fa-circle-check"}></i>
+                  </div>
+                  <div className="action-text">
+                    <div className="action-title">
+                      {isSavedInLibrary ? 'Saved in Your Library' : 'Save Album to Library'}
+                    </div>
+                    <div className="action-sub">
+                      {isSavedInLibrary ? 'Tap to remove album from your library' : 'Quickly access album from your Library tab'}
+                    </div>
+                  </div>
+                </button>
+
+                {/* 4. Download Album */}
+                <button
+                  className="action-sheet-row"
+                  disabled={batchDownloading}
+                  onClick={() => {
+                    triggerHaptic(20);
+                    setShowHeaderMenu(false);
+                    handleBatchDownloadAlbum();
+                  }}
+                >
+                  <div className="action-icon-circle blue">
+                    <i className={batchDownloading ? "fa-solid fa-spinner fa-spin" : isAllDownloaded ? "fa-solid fa-circle-check" : "fa-solid fa-circle-down"}></i>
+                  </div>
+                  <div className="action-text">
+                    <div className="action-title">
+                      {batchDownloading ? 'Downloading Album...' : isAllDownloaded ? 'All Tracks Downloaded' : 'Download Album'}
+                    </div>
+                    <div className="action-sub">
+                      {isAllDownloaded ? 'All tracks saved for offline listening' : `Download all ${albumTracks.length} tracks offline`}
+                    </div>
+                  </div>
+                </button>
+
+                {/* 5. Add to Playlist */}
+                <button
+                  className="action-sheet-row"
+                  onClick={() => {
+                    triggerHaptic(20);
+                    setShowPlaylistPicker(true);
+                  }}
+                >
+                  <div className="action-icon-circle orange">
+                    <i className="fa-solid fa-circle-plus"></i>
+                  </div>
+                  <div className="action-text">
+                    <div className="action-title">Add to Playlist</div>
+                    <div className="action-sub">Append all album tracks to a playlist</div>
+                  </div>
+                  <i className="fa-solid fa-chevron-right action-chevron"></i>
+                </button>
+
+                {/* 6. View Artist Profile */}
+                {matchingArtistData && (
+                  <button
+                    className="action-sheet-row"
+                    onClick={() => {
+                      triggerHaptic(20);
+                      setShowHeaderMenu(false);
+                      onSelectArtist(matchingArtistData);
+                    }}
+                  >
+                    <div className="action-icon-circle purple">
+                      <i className="fa-solid fa-user"></i>
+                    </div>
+                    <div className="action-text">
+                      <div className="action-title">View Artist: {album.artist}</div>
+                      <div className="action-sub">Explore artist profile, albums, and top hits</div>
+                    </div>
+                    <i className="fa-solid fa-chevron-right action-chevron"></i>
+                  </button>
+                )}
+
+                {/* 7. Share Album */}
+                <button
+                  className="action-sheet-row"
+                  onClick={() => {
+                    triggerHaptic(20);
+                    setShowHeaderMenu(false);
+                    handleShareAlbum();
+                  }}
+                >
+                  <div className="action-icon-circle teal">
+                    <i className="fa-solid fa-arrow-up-from-bracket"></i>
+                  </div>
+                  <div className="action-text">
+                    <div className="action-title">Share Album</div>
+                    <div className="action-sub">Share link or details with friends</div>
+                  </div>
+                </button>
+
+                {/* 8. Report Content */}
+                <button
+                  className="action-sheet-row danger"
+                  onClick={() => {
+                    triggerHaptic(30);
+                    setShowHeaderMenu(false);
+                    displayToast("Report submitted. We will review this album's artwork and metadata.");
+                  }}
+                >
+                  <div className="action-icon-circle red">
+                    <i className="fa-solid fa-flag"></i>
+                  </div>
+                  <div className="action-text">
+                    <div className="action-title" style={{ color: '#ff6b6b' }}>Report Issue / Explicit Art</div>
+                    <div className="action-sub">Flag inappropriate artwork or content issues</div>
+                  </div>
+                </button>
+              </div>
+            )}
+
+            {/* Footer Dismiss Button */}
+            <div className="action-sheet-footer">
+              <button 
+                className="action-sheet-dismiss-btn" 
+                onClick={() => { setShowHeaderMenu(false); setShowPlaylistPicker(false); }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

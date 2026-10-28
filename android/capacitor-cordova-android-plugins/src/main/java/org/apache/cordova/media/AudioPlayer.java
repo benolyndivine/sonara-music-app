@@ -19,6 +19,7 @@
 package org.apache.cordova.media;
 
 import android.content.Context;
+import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
@@ -136,6 +137,18 @@ public class AudioPlayer implements OnCompletionListener, OnPreparedListener, On
     public void destroy() {
         // Stop any play or record
         if (this.player != null) {
+            try {
+                int audioSessionId = this.player.getAudioSessionId();
+                Class<?> clazz = Class.forName("com.sonara.app.AudioEffectsPlugin");
+                java.lang.reflect.Method m = clazz.getMethod("detachAudioSession", int.class);
+                m.invoke(null, audioSessionId);
+
+                Intent closeSession = new Intent(android.media.audiofx.AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION);
+                closeSession.putExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, audioSessionId);
+                closeSession.putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, context.getPackageName());
+                context.sendBroadcast(closeSession);
+            } catch (Throwable ignored) {}
+
             if ((this.state == STATE.MEDIA_RUNNING) || (this.state == STATE.MEDIA_PAUSED)) {
                 this.player.stop();
                 this.setState(STATE.MEDIA_STOPPED);
@@ -495,6 +508,20 @@ public class AudioPlayer implements OnCompletionListener, OnPreparedListener, On
     public void onPrepared(MediaPlayer player) {
         // Listen for playback completion
         this.player.setOnCompletionListener(this);
+
+        // Connect Sonara native audio effects engine (Equalizer, 3D Spatial Audio, Dolby Atmos)
+        try {
+            int audioSessionId = this.player.getAudioSessionId();
+            Class<?> clazz = Class.forName("com.sonara.app.AudioEffectsPlugin");
+            java.lang.reflect.Method m = clazz.getMethod("attachAudioSession", int.class);
+            m.invoke(null, audioSessionId);
+
+            Intent openSession = new Intent(android.media.audiofx.AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION);
+            openSession.putExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, audioSessionId);
+            openSession.putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, context.getPackageName());
+            context.sendBroadcast(openSession);
+        } catch (Throwable ignored) {}
+
         // seek to any location received while not prepared
         this.seekToPlaying(this.seekOnPrepared);
         // apply any playback rate received while not prepared

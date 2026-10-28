@@ -2,12 +2,18 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { downloadTrackToDevice, isTrackCachedOffline, isCanvasVideoCachedOffline, getCanvasVideoSource } from '../utils/offlineStorage';
 import { parseSyncedLyrics, getActiveLyricsLineIndex } from '../utils/lyricsSync';
 import AudioRouteInfo, { getRouteIconClass, getRouteLabel } from '../utils/audioRoute';
+import { getStreamingQuality, getDownloadQuality, QUALITY_LABELS } from '../utils/audioQuality';
 import CachedImage from './CachedImage';
 
 export default function FullPlayerView({ 
   currentTrack, isPlaying, playlists, lyrics, isShuffle, isRepeat, sleepTimeLeft, trackProgress, trackDuration, lyricsSize, audioRoute,
+  streamingQuality: streamingQualityProp, downloadQuality: downloadQualityProp,
+  dolbyAtmos = false, spatialAudio = false,
+  isLiked = false, onToggleLike,
   onTogglePlay, onNext, onPrev, onSeekProgress, onToggleShuffle, onToggleRepeat, onSetSleepTimer, onAddSongToPlaylist, onGoToAlbum, onGoToArtist, onOpenQueue, onClose 
 }) {
+  const currentStreamingQuality = streamingQualityProp || getStreamingQuality();
+  const currentDownloadQuality = downloadQualityProp || getDownloadQuality();
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showPlaylistDropdown, setShowPlaylistDropdown] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -32,6 +38,19 @@ export default function FullPlayerView({
   };
 
   const resolvedImgSrc = currentTrack?.cover || currentTrack?.image || currentTrack?.imageUrl;
+
+  useEffect(() => {
+    if (!showMoreMenu && !showTimerMenu && !showPlaylistDropdown && !showLyricsSheet) return;
+    const handleFullPlayerBack = (e) => {
+      e.preventDefault();
+      if (showMoreMenu) setShowMoreMenu(false);
+      else if (showTimerMenu) setShowTimerMenu(false);
+      else if (showPlaylistDropdown) setShowPlaylistDropdown(false);
+      else if (showLyricsSheet) setShowLyricsSheet(false);
+    };
+    window.addEventListener('sonara_back_press', handleFullPlayerBack);
+    return () => window.removeEventListener('sonara_back_press', handleFullPlayerBack);
+  }, [showMoreMenu, showTimerMenu, showPlaylistDropdown, showLyricsSheet]);
 
   useEffect(() => {
     if (currentTrack) {
@@ -212,7 +231,7 @@ export default function FullPlayerView({
   if (!currentTrack) return null;
 
   const formatTimeSignature = (seconds) => {
-    if (isNaN(seconds) || seconds === undefined) return '0:00';
+    if (!Number.isFinite(seconds) || seconds <= 0) return '0:00';
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -246,7 +265,8 @@ export default function FullPlayerView({
       setIsDownloading(true);
       await downloadTrackToDevice(currentTrack);
       setIsDownloaded(true);
-      displayToast(`Saved "${resolvedTitle}" offline!`);
+      const dlQualityLabel = QUALITY_LABELS[currentDownloadQuality] || currentDownloadQuality;
+      displayToast(`Saved "${resolvedTitle}" offline (${dlQualityLabel})!`);
     } catch (err) {
       console.error('Offline download failed:', err);
       displayToast("Offline download failed.");
@@ -499,67 +519,81 @@ export default function FullPlayerView({
 
         {/* Bottom Track Controls Pushed 20px Up */}
         <div style={{ width: '100%', position: 'relative', zIndex: 10, marginTop: '-20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div style={{ overflow: 'hidden', paddingRight: '16px' }}>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '1.35rem', fontWeight: '700', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {/* Row 1: Track Details & Primary Quick Actions (Like & Add to Playlist) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '12px' }}>
+            <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
+              <h2 style={{
+                margin: '0 0 3px 0',
+                fontSize: '1.45rem',
+                fontWeight: '800',
+                color: '#ffffff',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                letterSpacing: '-0.3px',
+                lineHeight: 1.25
+              }}>
                 {resolvedTitle}
               </h2>
-              <p style={{ margin: 0, fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <p 
+                onClick={handleViewArtist}
+                style={{
+                  margin: 0,
+                  fontSize: '0.94rem',
+                  color: 'rgba(255,255,255,0.68)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+                title="View artist profile"
+              >
                 {currentTrack.artist}
               </p>
             </div>
             
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexShrink: 0, position: 'relative' }}>
+            {/* Primary Track Actions: Like & Add to Playlist */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0, position: 'relative' }}>
               <button 
-                onClick={handleDownloadClick}
-                style={{ background: 'none', border: 'none', color: isDownloaded ? 'var(--accent)' : '#ffffff', fontSize: '1.25rem', cursor: 'pointer', padding: '4px' }}
-                title={isDownloaded ? "Saved Offline" : "Download Track"}
+                onClick={(e) => onToggleLike && onToggleLike(e)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: isLiked ? 'var(--accent, #1db954)' : 'rgba(255, 255, 255, 0.75)',
+                  fontSize: '1.4rem',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                }}
+                title={isLiked ? "Remove from Liked Songs" : "Save to Liked Songs"}
               >
-                <i className={isDownloading ? "fa-solid fa-spinner fa-spin" : isDownloaded ? "fa-solid fa-circle-down" : "fa-solid fa-download"}></i>
+                <i className={`fa-${isLiked ? 'solid' : 'regular'} fa-heart`}></i>
               </button>
-
-              <button 
-                onClick={handleShareSong}
-                style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.25rem', cursor: 'pointer', padding: '4px' }}
-                title="Share track details"
-              >
-                <i className="fa-solid fa-share-nodes"></i>
-              </button>
-
-              {sleepTimeLeft != null && (
-                <button
-                  onClick={() => onSetSleepTimer(null)}
-                  title="Cancel sleep timer"
-                  style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '1.2rem', cursor: 'pointer' }}
-                >
-                  <i className="fa-solid fa-circle-xmark"></i>
-                </button>
-              )}
-
-              {activeTrackLyrics && (
-                <button
-                  onClick={() => setLyricsInlineMode(prev => !prev)}
-                  title={lyricsInlineMode ? "Show album art" : "Show live lyrics"}
-                  style={{
-                    width: '32px', height: '32px', borderRadius: '50%',
-                    backgroundColor: lyricsInlineMode ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
-                    border: 'none', color: lyricsInlineMode ? '#000000' : '#ffffff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.9rem'
-                  }}
-                >
-                  <i className="fa-solid fa-microphone-lines"></i>
-                </button>
-              )}
 
               <button 
                 onClick={() => setShowPlaylistDropdown(!showPlaylistDropdown)} 
-                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '1.3rem', cursor: 'pointer' }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: showPlaylistDropdown ? 'var(--accent, #1db954)' : 'rgba(255, 255, 255, 0.75)',
+                  fontSize: '1.38rem',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                title="Add to Playlist"
               >
                 <i className="fa-solid fa-circle-plus"></i>
               </button>
 
               {showPlaylistDropdown && (
-                <div className="premium-dropdown-menu" style={{ position: 'absolute', bottom: '40px', right: 0, top: 'auto', width: '180px' }}>
+                <div className="premium-dropdown-menu" style={{ position: 'absolute', bottom: '44px', right: 0, top: 'auto', width: '200px', zIndex: 100 }}>
                   <p className="dropdown-menu-header">Add to Playlist</p>
                   <div className="dropdown-scroll-container">
                     {playlists && playlists.length > 0 ? (
@@ -569,6 +603,7 @@ export default function FullPlayerView({
                           onClick={() => {
                             onAddSongToPlaylist(pl.id, currentTrack);
                             setShowPlaylistDropdown(false);
+                            displayToast(`Added to "${pl.playlistName}"`);
                           }}
                           className="dropdown-playlist-option"
                         >
@@ -582,6 +617,82 @@ export default function FullPlayerView({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Row 2: Audio Format & Acoustic Technology Badges (Single-line non-wrapping) */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            marginBottom: '12px',
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            flexWrap: 'nowrap'
+          }}>
+            <span 
+              style={{
+                fontSize: '0.62rem',
+                fontWeight: '800',
+                letterSpacing: '0.4px',
+                textTransform: 'uppercase',
+                padding: '3px 8px',
+                borderRadius: '8px',
+                backgroundColor: isDownloaded ? 'rgba(29, 185, 84, 0.16)' : 'rgba(255, 255, 255, 0.08)',
+                color: isDownloaded ? 'var(--accent)' : 'rgba(255, 255, 255, 0.88)',
+                border: isDownloaded ? '1px solid rgba(29, 185, 84, 0.35)' : '1px solid rgba(255, 255, 255, 0.12)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                flexShrink: 0
+              }}
+              title={isDownloaded ? "Playing from offline storage" : `Streaming at ${currentStreamingQuality} bitrate`}
+            >
+              <i className={isDownloaded ? "fa-solid fa-circle-down" : "fa-solid fa-bolt"} style={{ fontSize: '0.58rem' }}></i>
+              {isDownloaded ? 'Offline Lossless' : `${currentStreamingQuality.toUpperCase()} • ${QUALITY_LABELS[currentStreamingQuality] || '320 KBPS'}`}
+            </span>
+
+            {dolbyAtmos && (
+              <span
+                className="dolby-atmos-pill"
+                style={{
+                  fontSize: '0.62rem',
+                  fontWeight: '800',
+                  letterSpacing: '0.4px',
+                  padding: '3px 8px',
+                  borderRadius: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  flexShrink: 0
+                }}
+                title="Dolby Atmos 3D Virtualizer Active"
+              >
+                <i className="fa-solid fa-volume-high" style={{ fontSize: '0.6rem' }}></i> ATMOS 3D
+              </span>
+            )}
+
+            {spatialAudio && (
+              <span
+                style={{
+                  fontSize: '0.62rem',
+                  fontWeight: '800',
+                  letterSpacing: '0.4px',
+                  padding: '3px 8px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(56, 189, 248, 0.16)',
+                  color: '#38bdf8',
+                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  flexShrink: 0
+                }}
+                title="3D Spatial Audio Immersion Active"
+              >
+                <i className="fa-solid fa-headphones" style={{ fontSize: '0.6rem' }}></i> 3D SPATIAL
+              </span>
+            )}
           </div>
 
           <div style={{ marginBottom: '14px' }}>
@@ -634,53 +745,148 @@ export default function FullPlayerView({
             </button>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+          {/* Row 5: Sleek Player Tools & Utilities Dock (Queue, Lyrics, Download, Share, Sleep Timer) */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '4px 6px',
+            marginTop: '2px',
+            background: 'rgba(255, 255, 255, 0.035)',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(12px)',
+            position: 'relative'
+          }}>
+            {/* 1. Queue */}
             <button 
               onClick={onOpenQueue}
               style={{
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '14px', padding: '6px 14px', color: '#ffffff',
-                fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                background: 'none', border: 'none',
+                color: 'rgba(255, 255, 255, 0.85)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                cursor: 'pointer', padding: '6px 8px', borderRadius: '10px',
+                minWidth: '52px'
               }}
+              title="Up Next / Queue"
             >
-              <i className="fa-solid fa-list"></i> Queue
+              <i className="fa-solid fa-list-ul" style={{ fontSize: '1.02rem' }}></i>
+              <span style={{ fontSize: '0.64rem', fontWeight: '600', letterSpacing: '0.2px' }}>Queue</span>
             </button>
 
+            {/* 2. Lyrics */}
+            <button
+              onClick={() => setLyricsInlineMode(prev => !prev)}
+              style={{
+                background: lyricsInlineMode ? 'rgba(29, 185, 84, 0.16)' : 'none',
+                border: 'none',
+                color: lyricsInlineMode ? 'var(--accent, #1db954)' : (activeTrackLyrics ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.35)'),
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                cursor: activeTrackLyrics ? 'pointer' : 'default',
+                padding: '6px 8px', borderRadius: '10px',
+                minWidth: '52px'
+              }}
+              title={lyricsInlineMode ? "Hide live lyrics" : "Show live lyrics"}
+              disabled={!activeTrackLyrics}
+            >
+              <i className="fa-solid fa-microphone-lines" style={{ fontSize: '1.02rem' }}></i>
+              <span style={{ fontSize: '0.64rem', fontWeight: '600', letterSpacing: '0.2px' }}>Lyrics</span>
+            </button>
+
+            {/* 3. Download */}
+            <button 
+              onClick={handleDownloadClick}
+              style={{
+                background: isDownloaded ? 'rgba(29, 185, 84, 0.16)' : 'none',
+                border: 'none',
+                color: isDownloaded ? 'var(--accent, #1db954)' : 'rgba(255, 255, 255, 0.85)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                cursor: 'pointer', padding: '6px 8px', borderRadius: '10px',
+                minWidth: '52px'
+              }}
+              title={isDownloaded ? "Saved Offline" : "Download Track"}
+            >
+              <i className={isDownloading ? "fa-solid fa-spinner fa-spin" : isDownloaded ? "fa-solid fa-circle-check" : "fa-solid fa-circle-down"} style={{ fontSize: '1.02rem' }}></i>
+              <span style={{ fontSize: '0.64rem', fontWeight: '600', letterSpacing: '0.2px' }}>
+                {isDownloading ? 'Saving...' : isDownloaded ? 'Offline' : 'Save'}
+              </span>
+            </button>
+
+            {/* 4. Share */}
+            <button 
+              onClick={handleShareSong}
+              style={{
+                background: 'none', border: 'none',
+                color: 'rgba(255, 255, 255, 0.85)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                cursor: 'pointer', padding: '6px 8px', borderRadius: '10px',
+                minWidth: '52px'
+              }}
+              title="Share track"
+            >
+              <i className="fa-solid fa-share-nodes" style={{ fontSize: '1.02rem' }}></i>
+              <span style={{ fontSize: '0.64rem', fontWeight: '600', letterSpacing: '0.2px' }}>Share</span>
+            </button>
+
+            {/* 5. Sleep Timer */}
             <button 
               onClick={() => setShowTimerMenu(!showTimerMenu)}
               style={{
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '14px', padding: '6px 14px', color: sleepTimeLeft ? 'var(--accent)' : '#ffffff',
-                fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                background: sleepTimeLeft ? 'rgba(29, 185, 84, 0.16)' : 'none',
+                border: 'none',
+                color: sleepTimeLeft ? 'var(--accent, #1db954)' : 'rgba(255, 255, 255, 0.85)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                cursor: 'pointer', padding: '6px 8px', borderRadius: '10px',
+                minWidth: '52px'
               }}
+              title={sleepTimeLeft ? `Sleep timer active: ${sleepTimeLeft}m left` : "Set Sleep Timer"}
             >
-              <i className="fa-solid fa-stopwatch"></i>
-              {sleepTimeLeft ? `Sleeps in: ${sleepTimeLeft}m` : 'Sleep Timer'}
+              <i className="fa-solid fa-stopwatch" style={{ fontSize: '1.02rem' }}></i>
+              <span style={{ fontSize: '0.64rem', fontWeight: '600', letterSpacing: '0.2px' }}>
+                {sleepTimeLeft ? `${sleepTimeLeft}m` : 'Timer'}
+              </span>
             </button>
 
+            {/* Floating Timer Picker Popover */}
             {showTimerMenu && (
               <div style={{
-                position: 'absolute', bottom: '50px', left: '50%', transform: 'translateX(-50%)',
-                backgroundColor: 'rgba(20,28,43,0.95)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px', padding: '8px', zIndex: '320', display: 'flex', gap: '8px',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)'
+                position: 'absolute', bottom: '54px', right: '4px',
+                backgroundColor: 'rgba(17, 24, 39, 0.96)', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '12px', padding: '6px', zIndex: 320, display: 'flex', gap: '6px',
+                boxShadow: '0 10px 28px rgba(0,0,0,0.6)', backdropFilter: 'blur(16px)'
               }}>
                 {[5, 15, 30, 45, 60].map(mins => (
                   <button
                     key={mins}
                     onClick={() => {
-                      onSetSleepTimer(mins);
+                      onSetSleepTimer(sleepTimeLeft === mins ? null : mins);
                       setShowTimerMenu(false);
                     }}
                     style={{
-                      backgroundColor: sleepTimeLeft === mins ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
+                      backgroundColor: sleepTimeLeft === mins ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
                       border: 'none', borderRadius: '6px', color: sleepTimeLeft === mins ? '#000000' : '#ffffff',
-                      padding: '6px 10px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer'
+                      padding: '6px 10px', fontSize: '0.74rem', fontWeight: '700', cursor: 'pointer'
                     }}
                   >
                     {mins}m
                   </button>
                 ))}
+                {sleepTimeLeft && (
+                  <button
+                    onClick={() => {
+                      onSetSleepTimer(null);
+                      setShowTimerMenu(false);
+                    }}
+                    style={{
+                      backgroundColor: 'rgba(255, 77, 77, 0.2)',
+                      border: '1px solid rgba(255, 77, 77, 0.4)', borderRadius: '6px', color: '#ff6b6b',
+                      padding: '6px 8px', fontSize: '0.74rem', fontWeight: '700', cursor: 'pointer'
+                    }}
+                    title="Cancel Sleep Timer"
+                  >
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                )}
               </div>
             )}
           </div>

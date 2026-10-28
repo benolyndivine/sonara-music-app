@@ -15,7 +15,8 @@ export default function ArtistDetailsView({
   onSelectTrack,
   onBack,
   likedSongIds = [],
-  onToggleLike
+  onToggleLike,
+  onOpenSongMenu
 }) {
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [downloadedMap, setDownloadedMap] = useState({});
@@ -377,32 +378,14 @@ export default function ArtistDetailsView({
                   )}
 
                   {/* 3-Dot Options Menu */}
-                  <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
                     <button
                       className="track-options-btn"
-                      onClick={() => setActiveMenuId(activeMenuId === song.id ? null : song.id)}
+                      onClick={() => onOpenSongMenu ? onOpenSongMenu(song) : setActiveMenuId(activeMenuId === song.id ? null : song.id)}
+                      title="Track options"
                     >
                       <i className="fa-solid fa-ellipsis-vertical"></i>
                     </button>
-                    {activeMenuId === song.id && (
-                      <div className="premium-dropdown-menu" style={{ right: '10px', top: '30px', position: 'absolute', zIndex: 500 }}>
-                        <button
-                          onClick={(e) => handleDownloadTrack(e, song)}
-                          className="dropdown-playlist-option"
-                          style={{
-                            padding: '12px 14px', gap: '12px', display: 'flex',
-                            alignItems: 'center', background: 'transparent',
-                            border: 'none', width: '100%', textAlign: 'left',
-                            cursor: 'pointer', color: dlState === true ? 'var(--accent)' : '#ffffff'
-                          }}
-                        >
-                          <i className={dlState === 'loading' ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"} style={{ color: dlState === true ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}></i>
-                          <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>
-                            {dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Track'}
-                          </span>
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

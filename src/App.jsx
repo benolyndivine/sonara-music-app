@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { collection, doc, addDoc, deleteDoc, query, where, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, deleteDoc, query, where, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app'; 
@@ -10,9 +10,9 @@ import { MediaSession } from '@capgo/capacitor-media-session';
 import { BackgroundMode } from '@anuradev/capacitor-background-mode';
 import { Media } from '@awesome-cordova-plugins/media';
 import { db, auth, provider } from './firebase';
-import { getPlaybackSource, isTrackCachedOffline, downloadTrackToDevice } from './utils/offlineStorage';
+import { getPlaybackSource, isTrackCachedOffline, downloadTrackToDevice, runSmartStorageOptimization } from './utils/offlineStorage';
 import AudioRouteInfo from './utils/audioRoute';
-import { getStreamingQuality, appendQualityParam } from './utils/audioQuality';
+import { getStreamingQuality, setStreamingQuality, getDownloadQuality, setDownloadQuality, applyQualityToUrl } from './utils/audioQuality';
 import { songMatchesArtist, splitArtistCredits } from './utils/artistMatch';
 import Header from './components/Header';
 import SongRow from './components/SongRow';
@@ -41,17 +41,28 @@ import ManageSongsAdminView from './components/ManageSongsAdminView';
 import ManageCanvasVideosView from './components/ManageCanvasVideosView';
 import GenreDetailsView from './components/GenreDetailsView';
 import CachedImage from './components/CachedImage';
+import SongActionSheet from './components/SongActionSheet';
 import {
   getPlaybackSpeedSetting, setPlaybackSpeedSetting,
   getNormalizeVolumeSetting, setNormalizeVolumeSetting,
   getOfflineOnlyModeSetting, setOfflineOnlyModeSetting,
   getAutoplayInfiniteSetting, setAutoplayInfiniteSetting,
   getSpatialAudioSetting, setSpatialAudioSetting,
+  getDolbyAtmosSetting, setDolbyAtmosSetting,
   getHapticsSetting, setHapticsSetting,
   getEqPresetSetting, setEqPresetSetting,
+  getCrossfadeSetting, setCrossfadeSetting,
+  getCrossfadeDurationSetting, setCrossfadeDurationSetting,
+  getCrossfadeDurationSeconds,
+  getGaplessPlaybackSetting, setGaplessPlaybackSetting,
+  getAutomixSetting, setAutomixSetting,
+  fadeVolume,
+  findSimilarTrack,
   getKeepScreenAwakeSetting, requestScreenWakeLock, releaseScreenWakeLock,
   applyAudioEffectsToElement, applyAudioEffectsToNative,
-  triggerHaptic
+  triggerHaptic,
+  sonaraAudioEngine,
+  syncAllAudioEffectsToNative
 } from './utils/audioEffects';
 import { APP_THEMES, getSavedThemeId, getThemeById, saveThemeId } from './utils/themes';
 import { CURRENT_APP_VERSION, isNewerVersion, notifyAppUpdate } from './utils/updateService';
@@ -88,6 +99,8 @@ export default function App() {
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [libraryActiveTab, setLibraryActiveTab] = useState('playlists');
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
+  const [actionSheetSong, setActionSheetSong] = useState(null);
+  const [actionSheetPlaylistId, setActionSheetPlaylistId] = useState(null);
 
   const [currentView, setCurrentView] = useState('home');
   const [homeFilter, setHomeFilter] = useState('All');
@@ -208,12 +221,43 @@ export default function App() {
     try { localStorage.setItem('sonara_lyrics_size', val); } catch {}
   };
 
-  const [crossfadeEnabled, setCrossfadeEnabledState] = useState(() => {
-    try { return localStorage.getItem('sonara_crossfade') === 'true'; } catch { return false; }
-  });
+  const [crossfadeEnabled, setCrossfadeEnabledState] = useState(getCrossfadeSetting);
   const setCrossfadeEnabled = (val) => {
     setCrossfadeEnabledState(val);
-    try { localStorage.setItem('sonara_crossfade', String(val)); } catch {}
+    setCrossfadeSetting(val);
+  };
+
+  const [crossfadeDuration, setCrossfadeDurationState] = useState(getCrossfadeDurationSetting);
+  const setCrossfadeDuration = (val) => {
+    setCrossfadeDurationState(val);
+    setCrossfadeDurationSetting(val);
+    setCrossfadeEnabledState(val !== 'Off');
+  };
+
+  const [gaplessPlayback, setGaplessPlaybackState] = useState(getGaplessPlaybackSetting);
+  const setGaplessPlayback = (val) => {
+    setGaplessPlaybackState(val);
+    setGaplessPlaybackSetting(val);
+  };
+
+  const [automixEnabled, setAutomixEnabledState] = useState(getAutomixSetting);
+  const setAutomixEnabled = (val) => {
+    setAutomixEnabledState(val);
+    setAutomixSetting(val);
+  };
+
+  const [dolbyAtmos, setDolbyAtmosState] = useState(getDolbyAtmosSetting);
+  const setDolbyAtmos = (val) => {
+    setDolbyAtmosState(val);
+    setDolbyAtmosSetting(val);
+  };
+
+  const [originIslandActive, setOriginIslandActiveState] = useState(() => {
+    try { return localStorage.getItem('sonara_origin_island_enabled') !== 'false'; } catch { return true; }
+  });
+  const setOriginIslandActive = (val) => {
+    setOriginIslandActiveState(val);
+    try { localStorage.setItem('sonara_origin_island_enabled', String(val)); } catch {}
   };
 
   // 🎛️ Dynamic Audio Engine Settings
@@ -259,6 +303,75 @@ export default function App() {
     setEqPresetSetting(val);
   };
 
+  const [streamingQuality, setStreamingQualityState] = useState(getStreamingQuality);
+  const setStreamingQualityVal = (val) => {
+    setStreamingQualityState(val);
+    setStreamingQuality(val);
+  };
+
+  const [downloadQuality, setDownloadQualityState] = useState(getDownloadQuality);
+  const setDownloadQualityVal = (val) => {
+    setDownloadQualityState(val);
+    setDownloadQuality(val);
+  };
+
+  useEffect(() => {
+    syncAllAudioEffectsToNative();
+    if (audioRef.current) {
+      sonaraAudioEngine.attachElement(audioRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Smart Storage Optimization: automatically purge corrupt/orphaned cache on app startup
+    const isSmartStorage = localStorage.getItem('sonara_smart_cache') !== 'false';
+    if (isSmartStorage) {
+      runSmartStorageOptimization({ songs }).catch(() => {});
+    }
+  }, [songs.length > 0]);
+
+  useEffect(() => {
+    const handleQualityChange = (e) => {
+      const newQuality = e.detail?.quality;
+      if (!newQuality) return;
+      setStreamingQualityState(newQuality);
+
+      // If active track is streaming live over network, seamlessly update source
+      if (currentTrack && !isTrackCachedOffline(currentTrack.id)) {
+        const nextUrl = getPlaybackSource(currentTrack, { quality: newQuality });
+        if (Capacitor.isNativePlatform()) {
+          if (mediaRef.current && isPlaying) {
+            mediaRef.current.getCurrentPosition((pos) => {
+              const resumeSec = (pos > 0) ? pos : 0;
+              startNativeTrack(currentTrack, true, resumeSec);
+            });
+          }
+        } else if (audioRef.current && nextUrl) {
+          const curTime = audioRef.current.currentTime || 0;
+          const wasPlaying = !audioRef.current.paused;
+          if (audioRef.current.src !== nextUrl) {
+            audioRef.current.src = nextUrl;
+            audioRef.current.currentTime = curTime;
+            if (wasPlaying) {
+              audioRef.current.play().catch(console.warn);
+            }
+          }
+        }
+      }
+    };
+
+    const handleDownloadQualityChange = (e) => {
+      if (e.detail?.quality) setDownloadQualityState(e.detail.quality);
+    };
+
+    window.addEventListener('sonara_streaming_quality_changed', handleQualityChange);
+    window.addEventListener('sonara_download_quality_changed', handleDownloadQualityChange);
+    return () => {
+      window.removeEventListener('sonara_streaming_quality_changed', handleQualityChange);
+      window.removeEventListener('sonara_download_quality_changed', handleDownloadQualityChange);
+    };
+  }, [currentTrack, isPlaying]);
+
   useEffect(() => {
     if (getKeepScreenAwakeSetting()) {
       requestScreenWakeLock();
@@ -271,6 +384,11 @@ export default function App() {
   const loadedNativeTrackIdRef = useRef(null);
   const nativeProgressIntervalRef = useRef(null);
   const prefetchAudioRef = useRef(null);
+  const crossfadeAudioRef = useRef(null);
+  const isCrossfadingRef = useRef(false);
+  const fadingOutgoingAudioRef = useRef(null);
+  const fadingNativeMediaRef = useRef(null);
+  const fadeCancelRef = useRef(null);
   const nextTrackRef = useRef(null);
   const sleepTimerRef = useRef(null);
   const lastTrackChangeAtRef = useRef(0);
@@ -418,153 +536,167 @@ export default function App() {
     }
   };
 
-  const screenSnapshotRef = useRef({
-    currentView, selectedAlbum, selectedArtist, selectedGenre, libraryActiveTab, selectedPlaylist
-  });
-  const navHistoryRef = useRef([]);
-  const isBackNavigationRef = useRef(false);
+  // 🧭 Unified Navigation & History Stack Architecture
+  const tabHistoryRef = useRef([]);
+  const detailHistoryRef = useRef([]);
+  const detailOriginViewRef = useRef(null);
+  const lastBackPressTimeRef = useRef(0);
 
-  useEffect(() => {
-    const nextSnapshot = { currentView, selectedAlbum, selectedArtist, selectedGenre, libraryActiveTab, selectedPlaylist };
-    const prevSnapshot = screenSnapshotRef.current;
+  const openDetailView = ({ album = null, artist = null, genre = null, playlist = null }) => {
+    // If a detail view is already active (e.g. browsing an album and clicked an artist),
+    // save the current detail view on the stack so back button returns to the previous detail view.
+    if (selectedAlbum || selectedArtist || selectedGenre || selectedPlaylist) {
+      detailHistoryRef.current.push({
+        selectedAlbum,
+        selectedArtist,
+        selectedGenre,
+        selectedPlaylist,
+        currentView
+      });
+    } else {
+      // First detail view opened — save the origin view (e.g. 'search', 'library', 'all-albums', 'home')
+      detailOriginViewRef.current = currentView;
+    }
+    setSelectedAlbum(album);
+    setSelectedArtist(artist);
+    setSelectedGenre(genre);
+    setSelectedPlaylist(playlist);
+    try { window.history.pushState({ sonaraNav: true }, ''); } catch (_) {}
+  };
 
-    const didChange =
-      prevSnapshot.currentView !== nextSnapshot.currentView ||
-      prevSnapshot.selectedAlbum !== nextSnapshot.selectedAlbum ||
-      prevSnapshot.selectedArtist !== nextSnapshot.selectedArtist ||
-      prevSnapshot.selectedGenre !== nextSnapshot.selectedGenre ||
-      prevSnapshot.libraryActiveTab !== nextSnapshot.libraryActiveTab ||
-      (prevSnapshot.selectedPlaylist?.id ?? null) !== (nextSnapshot.selectedPlaylist?.id ?? null);
+  const handleAppBack = () => {
+    // Step 0: Dispatch custom back event to give nested sub-modals and dropdowns first priority
+    const customEvent = new CustomEvent('sonara_back_press', { cancelable: true });
+    const isHandled = !window.dispatchEvent(customEvent);
+    if (isHandled) {
+      triggerHaptic(15);
+      return true;
+    }
 
-    if (didChange) {
-      if (isBackNavigationRef.current) {
-        isBackNavigationRef.current = false;
-      } else {
-        navHistoryRef.current.push(prevSnapshot);
+    // Step 1: Song 3-dot Context Action Sheet
+    if (actionSheetSong || actionSheetPlaylistId) {
+      triggerHaptic(15);
+      setActionSheetSong(null);
+      setActionSheetPlaylistId(null);
+      return true;
+    }
+
+    // Step 2: Full-screen Admin screens
+    if (showUploadSong) { triggerHaptic(15); setShowUploadSong(false); return true; }
+    if (showManageAlbums) { triggerHaptic(15); setShowManageAlbums(false); return true; }
+    if (showManageArtists) { triggerHaptic(15); setShowManageArtists(false); return true; }
+    if (showManageLyrics) { triggerHaptic(15); setShowManageLyrics(false); return true; }
+    if (showManageGenres) { triggerHaptic(15); setShowManageGenres(false); return true; }
+    if (showManageSongs) { triggerHaptic(15); setShowManageSongs(false); return true; }
+    if (showManageCanvas) { triggerHaptic(15); setShowManageCanvas(false); return true; }
+
+    // Step 3: Top-level Overlays (Settings, Downloads, Notifications, Profile, Queue, About)
+    if (showAboutModal) { triggerHaptic(15); setShowAboutModal(false); return true; }
+    if (showQueueModal) { triggerHaptic(15); setShowQueueModal(false); return true; }
+    if (showDownloads) { triggerHaptic(15); setShowDownloads(false); return true; }
+    if (showNotifications) { triggerHaptic(15); setShowNotifications(false); return true; }
+    if (showSettings) { triggerHaptic(15); setShowSettings(false); return true; }
+    if (showProfile) { triggerHaptic(15); setShowProfile(false); return true; }
+
+    // Step 4: Full Player Overlay (slide down to mini player)
+    if (showFullPlayer) {
+      triggerHaptic(20);
+      setShowFullPlayer(false);
+      return true;
+    }
+
+    // Step 5: Detail View History (e.g. from Artist back to Album)
+    if (detailHistoryRef.current.length > 0) {
+      const prev = detailHistoryRef.current.pop();
+      triggerHaptic(20);
+      setSelectedAlbum(prev.selectedAlbum);
+      setSelectedArtist(prev.selectedArtist);
+      setSelectedGenre(prev.selectedGenre);
+      setSelectedPlaylist(prev.selectedPlaylist);
+      if (prev.currentView && prev.currentView !== currentView) {
+        setCurrentView(prev.currentView);
+      }
+      return true;
+    }
+
+    // Step 6: Active Detail Item (Album, Artist, Genre, Playlist) -> return to origin view
+    if (selectedAlbum || selectedArtist || selectedGenre || selectedPlaylist) {
+      triggerHaptic(20);
+      setSelectedAlbum(null);
+      setSelectedArtist(null);
+      setSelectedGenre(null);
+      setSelectedPlaylist(null);
+      if (detailOriginViewRef.current) {
+        setCurrentView(detailOriginViewRef.current);
+        detailOriginViewRef.current = null;
+      }
+      return true;
+    }
+
+    // Step 7: Sub-views ('all-songs', 'all-albums', 'all-artists') -> return to previous view or home
+    if (currentView === 'all-songs' || currentView === 'all-albums' || currentView === 'all-artists') {
+      triggerHaptic(20);
+      const prev = tabHistoryRef.current.pop() || 'home';
+      setCurrentView(prev);
+      return true;
+    }
+
+    // Step 8: Tab History (e.g. from Library back to Search, from Search back to Home)
+    if (tabHistoryRef.current.length > 0) {
+      const prev = tabHistoryRef.current.pop();
+      if (prev && prev !== currentView) {
+        triggerHaptic(20);
+        setCurrentView(prev);
+        return true;
       }
     }
-    screenSnapshotRef.current = nextSnapshot;
-  }, [currentView, selectedAlbum, selectedArtist, selectedGenre, libraryActiveTab, selectedPlaylist]);
 
-  const backHandlerStateRef = useRef({});
-  useEffect(() => {
-    backHandlerStateRef.current = {
-      showAboutModal,
-      showQueueModal,
-      showFullPlayer,
-      showDownloads,
-      showNotifications,
-      showSettings,
-      showUploadSong,
-      showManageAlbums,
-      showManageArtists,
-      showManageLyrics,
-      showManageGenres,
-      showManageSongs,
-      showManageCanvas,
-      showProfile,
-      selectedPlaylist,
-      selectedAlbum,
-      selectedArtist,
-      selectedGenre,
-      currentView
-    };
-  });
+    // If on search or library and tab history is empty, return to home:
+    if (currentView !== 'home') {
+      triggerHaptic(20);
+      setCurrentView('home');
+      return true;
+    }
 
+    // Step 9: At Root Home Screen: Standard Android Double-Back to Minimize
+    const now = Date.now();
+    if (now - lastBackPressTimeRef.current < 2000) {
+      if (Capacitor.isNativePlatform()) {
+        CapacitorApp.minimizeApp();
+      }
+    } else {
+      lastBackPressTimeRef.current = now;
+      triggerHaptic(30);
+      showToast("Press back again to exit", "info", "fa-arrow-right-from-bracket");
+    }
+    return true;
+  };
+
+  const handleTabChange = (view) => {
+    if (view === currentView && !selectedAlbum && !selectedArtist && !selectedGenre && !selectedPlaylist) {
+      return;
+    }
+    if (view !== currentView) {
+      tabHistoryRef.current.push(currentView);
+      setCurrentView(view);
+      try { window.history.pushState({ sonaraNav: true }, ''); } catch (_) {}
+    }
+    setSelectedAlbum(null);
+    setSelectedArtist(null);
+    setSelectedGenre(null);
+    setSelectedPlaylist(null);
+    detailHistoryRef.current = [];
+    detailOriginViewRef.current = null;
+  };
+
+  // 📱 Android Hardware Navigation Bar Back Button & Gesture Handler
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
     let listenerHandle = null;
     const registerListener = async () => {
       listenerHandle = await CapacitorApp.addListener('backButton', () => {
-        const state = backHandlerStateRef.current;
-        if (state.showAboutModal) {
-          setShowAboutModal(false);
-          return;
-        }
-        if (state.showQueueModal) {
-          setShowQueueModal(false);
-          return;
-        }
-        if (state.showFullPlayer) {
-          setShowFullPlayer(false);
-          return;
-        }
-        if (state.showDownloads) {
-          setShowDownloads(false);
-          return;
-        }
-        if (state.showNotifications) {
-          setShowNotifications(false);
-          return;
-        }
-        if (state.showSettings) {
-          setShowSettings(false);
-          return;
-        }
-        if (state.showUploadSong) {
-          setShowUploadSong(false);
-          return;
-        }
-        if (state.showManageAlbums) {
-          setShowManageAlbums(false);
-          return;
-        }
-        if (state.showManageArtists) {
-          setShowManageArtists(false);
-          return;
-        }
-        if (state.showManageLyrics) {
-          setShowManageLyrics(false);
-          return;
-        }
-        if (state.showManageGenres) {
-          setShowManageGenres(false);
-          return;
-        }
-        if (state.showManageSongs) {
-          setShowManageSongs(false);
-          return;
-        }
-        if (state.showManageCanvas) {
-          setShowManageCanvas(false);
-          return;
-        }
-        if (state.showProfile) {
-          setShowProfile(false);
-          return;
-        }
-        if (state.selectedPlaylist) {
-          setSelectedPlaylist(null);
-          return;
-        }
-        if (state.selectedAlbum) {
-          setSelectedAlbum(null);
-          return;
-        }
-        if (state.selectedArtist) {
-          setSelectedArtist(null);
-          return;
-        }
-        if (state.selectedGenre) {
-          setSelectedGenre(null);
-          return;
-        }
-
-        const previous = navHistoryRef.current.pop();
-        if (previous) {
-          isBackNavigationRef.current = true;
-          setCurrentView(previous.currentView);
-          setSelectedAlbum(previous.selectedAlbum);
-          setSelectedArtist(previous.selectedArtist);
-          setSelectedGenre(previous.selectedGenre);
-          setLibraryActiveTab(previous.libraryActiveTab);
-          setSelectedPlaylist(previous.selectedPlaylist);
-        } else if (state.currentView !== 'home') {
-          setCurrentView('home');
-        } else {
-          CapacitorApp.minimizeApp();
-        }
+        handleAppBack();
       });
     };
 
@@ -575,12 +707,55 @@ export default function App() {
         listenerHandle.remove();
       }
     };
-  }, []);
+  }, [
+    actionSheetSong, actionSheetPlaylistId,
+    showUploadSong, showManageAlbums, showManageArtists, showManageLyrics, showManageGenres, showManageSongs, showManageCanvas,
+    showAboutModal, showQueueModal, showDownloads, showNotifications, showSettings, showProfile, showFullPlayer,
+    selectedAlbum, selectedArtist, selectedGenre, selectedPlaylist, currentView
+  ]);
 
-  const audioStateRef = useRef({ songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying, autoplayInfinite });
+  // 🌐 Web Browser & PWA Popstate / Back Button Support
   useEffect(() => {
-    audioStateRef.current = { songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying, autoplayInfinite };
-  }, [songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying, autoplayInfinite]);
+    const handlePopState = () => {
+      handleAppBack();
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [
+    actionSheetSong, actionSheetPlaylistId,
+    showUploadSong, showManageAlbums, showManageArtists, showManageLyrics, showManageGenres, showManageSongs, showManageCanvas,
+    showAboutModal, showQueueModal, showDownloads, showNotifications, showSettings, showProfile, showFullPlayer,
+    selectedAlbum, selectedArtist, selectedGenre, selectedPlaylist, currentView
+  ]);
+
+  const audioStateRef = useRef({
+    songs,
+    currentQueue,
+    currentTrack,
+    isShuffle,
+    isRepeat,
+    isPlaying,
+    autoplayInfinite,
+    crossfadeEnabled,
+    crossfadeDuration,
+    gaplessPlayback,
+    automixEnabled
+  });
+  useEffect(() => {
+    audioStateRef.current = {
+      songs,
+      currentQueue,
+      currentTrack,
+      isShuffle,
+      isRepeat,
+      isPlaying,
+      autoplayInfinite,
+      crossfadeEnabled,
+      crossfadeDuration,
+      gaplessPlayback,
+      automixEnabled
+    };
+  }, [songs, currentQueue, currentTrack, isShuffle, isRepeat, isPlaying, autoplayInfinite, crossfadeEnabled, crossfadeDuration, gaplessPlayback, automixEnabled]);
 
   useEffect(() => {
     const goOnline = () => setIsOnline(true);
@@ -619,17 +794,47 @@ export default function App() {
     let listenerHandle;
     let cancelled = false;
 
-    AudioRouteInfo.getStatus()
-      .then((status) => { if (!cancelled) setAudioRoute(status); })
-      .catch(() => {});
+    const refreshRoute = () => {
+      AudioRouteInfo.getStatus()
+        .then((status) => {
+          if (!cancelled && status) {
+            setAudioRoute(status);
+          }
+        })
+        .catch(() => {});
+    };
+
+    refreshRoute();
+
+    if (Capacitor.isNativePlatform() && AudioRouteInfo.checkPermissions) {
+      AudioRouteInfo.checkPermissions()
+        .then((perm) => {
+          if (perm && perm.bluetooth !== 'granted' && AudioRouteInfo.requestPermissions) {
+            AudioRouteInfo.requestPermissions().then(() => refreshRoute()).catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
 
     AudioRouteInfo.addListener('audioRouteChanged', (status) => {
-      setAudioRoute(status);
+      if (!cancelled && status) {
+        setAudioRoute(status);
+      }
     }).then((handle) => { listenerHandle = handle; });
+
+    // Periodic gentle refresh every 3 seconds so Bluetooth connect/disconnect from Android quick-settings shade reflects immediately
+    const pollTimer = setInterval(refreshRoute, 3000);
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) refreshRoute();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       cancelled = true;
       listenerHandle?.remove();
+      clearInterval(pollTimer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);
 
@@ -661,7 +866,7 @@ export default function App() {
         const dur = typeof media.getDuration === 'function' ? media.getDuration() : -1;
         if (!dur || dur <= 0) return;
         media.getCurrentPosition().then((pos) => {
-          if (pos != null && pos >= dur - 1) {
+          if (!isCrossfadingRef.current && pos != null && pos >= dur - 1 && (Date.now() - lastTrackChangeAtRef.current > 10000)) {
             triggerNextTrackLogic();
           } else if (pos != null && pos >= 0) {
             setTrackProgress(pos);
@@ -672,7 +877,7 @@ export default function App() {
 
       const audio = audioRef.current;
       if (!audio) return;
-      if (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.5)) {
+      if (!isCrossfadingRef.current && (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.5)) && (Date.now() - lastTrackChangeAtRef.current > 10000)) {
         triggerNextTrackLogic();
       } else if (audioStateRef.current.isPlaying && audio.paused) {
         audio.play().catch(() => {});
@@ -758,6 +963,13 @@ export default function App() {
 
         bgListenerHandle = await BackgroundMode.addListener('appInBackground', async () => {
           try { await BackgroundMode.disableWebViewOptimizations(); } catch (_) {}
+          // Re-assert MediaSession on minimization to ensure Vivo Origin Island & Android Smart Island display the live capsule
+          try {
+            const { currentTrack: t, isPlaying: p } = audioStateRef.current;
+            if (t && localStorage.getItem('sonara_origin_island_enabled') !== 'false') {
+              updateMediaSession(t, p);
+            }
+          } catch (_) {}
         });
 
         fgListenerHandle = await BackgroundMode.addListener('appInForeground', () => {
@@ -766,7 +978,7 @@ export default function App() {
           const dur = typeof media.getDuration === 'function' ? media.getDuration() : -1;
           if (!dur || dur <= 0) return;
           media.getCurrentPosition().then((pos) => {
-            if (pos != null && pos >= dur - 1) {
+            if (!isCrossfadingRef.current && pos != null && pos >= dur - 1 && (Date.now() - lastTrackChangeAtRef.current > 10000)) {
               triggerNextTrackLogic();
             }
           }).catch(() => {});
@@ -780,13 +992,14 @@ export default function App() {
     initBackgroundServices();
 
     const nativeWatchdogInterval = setInterval(() => {
-      if (!Capacitor.isNativePlatform() || !audioStateRef.current.isPlaying) return;
+      if (!Capacitor.isNativePlatform() || !audioStateRef.current.isPlaying || isCrossfadingRef.current) return;
+      if (Date.now() - lastTrackChangeAtRef.current < 10000) return;
       const media = mediaRef.current;
       if (!media) return;
       const dur = typeof media.getDuration === 'function' ? media.getDuration() : -1;
       if (!dur || dur <= 0) return;
       media.getCurrentPosition().then((pos) => {
-        if (pos != null && pos >= dur - 1) {
+        if (!isCrossfadingRef.current && pos != null && pos >= dur - 1) {
           triggerNextTrackLogic();
         }
       }).catch(() => {});
@@ -799,7 +1012,332 @@ export default function App() {
     };
   }, []);
 
+  const peekNextTrack = () => {
+    const { songs: s, currentQueue: q, currentTrack: t, isShuffle: sh, autoplayInfinite: autoInf } = audioStateRef.current;
+    const queue = q.length > 0 ? q : s;
+    if (!queue.length) return null;
+
+    if (sh) {
+      if (queue.length > 1) {
+        if (!shuffleBagRef.current || shuffleBagRef.current.length === 0) {
+          if (!autoInf) return null;
+          return findSimilarTrack(t, s, playHistoryRef.current) || queue[0];
+        }
+        const nextId = shuffleBagRef.current[0];
+        return queue.find(track => track.id === nextId) || queue[0];
+      } else {
+        if (!autoInf) return null;
+        return findSimilarTrack(t, s, playHistoryRef.current) || queue[0];
+      }
+    } else {
+      const idx = queue.findIndex(track => track.id === t?.id);
+      if (idx === queue.length - 1) {
+        if (!autoInf) return null;
+        return findSimilarTrack(t, s, playHistoryRef.current) || queue[0];
+      }
+      return queue[(idx + 1) % queue.length];
+    }
+  };
+
+  const cleanupFadingAudio = () => {
+    isCrossfadingRef.current = false;
+    if (fadeCancelRef.current) {
+      try { fadeCancelRef.current(); } catch (_) {}
+      fadeCancelRef.current = null;
+    }
+    if (fadingOutgoingAudioRef.current) {
+      const out = fadingOutgoingAudioRef.current;
+      fadingOutgoingAudioRef.current = null;
+      try {
+        out.onended = null;
+        out.ontimeupdate = null;
+        out.onloadedmetadata = null;
+        out.onerror = null;
+        out.pause();
+        out.currentTime = 0;
+        out.removeAttribute('src');
+        out.load();
+        out.volume = 1.0;
+      } catch (_) {}
+    }
+    if (fadingNativeMediaRef.current) {
+      const out = fadingNativeMediaRef.current;
+      fadingNativeMediaRef.current = null;
+      try {
+        if (out.onSuccess && typeof out.onSuccess.unsubscribe === 'function') {
+          out.onSuccess.unsubscribe();
+        }
+        out.successCallback = null;
+        if (out._objectInstance) out._objectInstance.successCallback = null;
+        out.stop();
+        out.release();
+      } catch (_) {}
+    }
+  };
+
+  const startNativeCrossfade = async (durationSec) => {
+    const next = peekNextTrack();
+    if (!next) {
+      isCrossfadingRef.current = false;
+      return;
+    }
+
+    const nextUrl = getPlaybackSource(next, { quality: streamingQuality });
+    if (!nextUrl) {
+      isCrossfadingRef.current = false;
+      return;
+    }
+
+    const fadeMs = durationSec * 1000;
+    const outgoingMedia = mediaRef.current;
+    fadingNativeMediaRef.current = outgoingMedia;
+
+    // Disconnect completion callbacks on outgoing media so stopping it never triggers track skip
+    if (outgoingMedia) {
+      try {
+        if (outgoingMedia.onSuccess && typeof outgoingMedia.onSuccess.unsubscribe === 'function') {
+          outgoingMedia.onSuccess.unsubscribe();
+        }
+        outgoingMedia.successCallback = null;
+        if (outgoingMedia._objectInstance) {
+          outgoingMedia._objectInstance.successCallback = null;
+        }
+      } catch (_) {}
+    }
+
+    let incomingMedia;
+    try {
+      incomingMedia = Media.create(nextUrl);
+    } catch (err) {
+      console.warn('Native crossfade Media.create error:', err);
+      isCrossfadingRef.current = false;
+      return;
+    }
+
+    try { incomingMedia.setVolume(0); } catch (_) {}
+    incomingMedia.play();
+
+    let cancelOut = () => {};
+    if (outgoingMedia) {
+      cancelOut = fadeVolume(outgoingMedia, 1.0, 0, fadeMs, () => {
+        try {
+          if (outgoingMedia.onSuccess && typeof outgoingMedia.onSuccess.unsubscribe === 'function') {
+            outgoingMedia.onSuccess.unsubscribe();
+          }
+          outgoingMedia.successCallback = null;
+          if (outgoingMedia._objectInstance) {
+            outgoingMedia._objectInstance.successCallback = null;
+          }
+          outgoingMedia.stop();
+          outgoingMedia.release();
+        } catch (_) {}
+        if (fadingNativeMediaRef.current === outgoingMedia) {
+          fadingNativeMediaRef.current = null;
+        }
+      });
+    }
+
+    const cancelIn = fadeVolume(incomingMedia, 0, 1.0, fadeMs, () => {
+      isCrossfadingRef.current = false;
+    });
+
+    fadeCancelRef.current = () => {
+      cancelOut();
+      cancelIn();
+    };
+
+    mediaRef.current = incomingMedia;
+    loadedNativeTrackIdRef.current = next.id;
+    lastTrackChangeAtRef.current = Date.now();
+    setTrackProgress(0);
+    setTrackDuration(0);
+
+    const thisTrackId = next.id;
+    incomingMedia.onSuccess.subscribe(() => {
+      if (loadedNativeTrackIdRef.current !== thisTrackId) return;
+      if (isCrossfadingRef.current) return;
+      if (Date.now() - lastTrackChangeAtRef.current < 10000) return;
+      const { isRepeat: r } = audioStateRef.current;
+      if (r) {
+        startNativeTrack(next, true);
+      } else {
+        triggerNextTrackLogic();
+      }
+    });
+
+    if (typeof incomingMedia.onError?.subscribe === 'function') {
+      incomingMedia.onError.subscribe((err) => console.error('Native crossfade audio playback error:', err));
+    }
+
+    // Reset progress tracking interval and re-bind strictly to incomingMedia
+    if (nativeProgressIntervalRef.current) {
+      clearInterval(nativeProgressIntervalRef.current);
+      nativeProgressIntervalRef.current = null;
+    }
+
+    nativeProgressIntervalRef.current = setInterval(() => {
+      const m = mediaRef.current;
+      if (!m) return;
+
+      const dur = typeof m.getDuration === 'function' ? m.getDuration() : -1;
+      if (dur && dur > 0) setTrackDuration(dur);
+
+      if (typeof m.getCurrentPosition === 'function') {
+        m.getCurrentPosition().then((pos) => {
+          if (pos != null && pos >= 0) {
+            setTrackProgress(pos);
+            if (Capacitor.isNativePlatform() && dur > 0) {
+              MediaSession.setPositionState({ duration: dur, playbackRate: 1.0, position: pos }).catch(() => {});
+            }
+
+            // Crossfade check for incoming track (must play >= 15s to prevent immediate chained triggers)
+            const { crossfadeEnabled: cfOn, crossfadeDuration: cfDur, isRepeat: r } = audioStateRef.current;
+            if (cfOn && cfDur !== 'Off' && !r && !isCrossfadingRef.current && dur > 8 && (Date.now() - lastTrackChangeAtRef.current > 15000)) {
+              const durSec = parseInt(cfDur, 10) || 0;
+              const timeLeft = dur - pos;
+              if (durSec > 0 && timeLeft <= durSec && timeLeft > 0.4) {
+                isCrossfadingRef.current = true;
+                startNativeCrossfade(durSec);
+              }
+            }
+          }
+        }).catch(() => {});
+      }
+    }, 500);
+
+    syncAllAudioEffectsToNative();
+
+    if (currentTrack && currentTrack.id !== next.id) {
+      playHistoryRef.current.push(currentTrack);
+      if (playHistoryRef.current.length > 50) playHistoryRef.current.shift();
+    }
+    setCurrentTrack(next);
+    setIsPlaying(true);
+    recordRecentlyPlayed(next);
+    updateMediaSession(next, true);
+  };
+
+  const startWebCrossfade = async (durationSec) => {
+    const next = peekNextTrack();
+    if (!next) {
+      isCrossfadingRef.current = false;
+      return;
+    }
+
+    const nextUrl = getPlaybackSource(next, { quality: streamingQuality });
+    if (!nextUrl) {
+      isCrossfadingRef.current = false;
+      return;
+    }
+    const resolvedNextUrl = new URL(nextUrl, window.location.href).href;
+    const fadeMs = durationSec * 1000;
+
+    if (!crossfadeAudioRef.current) {
+      crossfadeAudioRef.current = new Audio();
+      crossfadeAudioRef.current.crossOrigin = 'anonymous';
+      crossfadeAudioRef.current.setAttribute('playsinline', '');
+      crossfadeAudioRef.current.setAttribute('webkit-playsinline', '');
+    }
+
+    const outgoingAudio = audioRef.current;
+    const incomingAudio = crossfadeAudioRef.current;
+
+    // Disconnect event listeners on outgoing element immediately so it can never trigger track skips
+    if (outgoingAudio) {
+      outgoingAudio.onended = null;
+      outgoingAudio.ontimeupdate = null;
+      outgoingAudio.onloadedmetadata = null;
+      outgoingAudio.onerror = null;
+    }
+
+    if (fadingOutgoingAudioRef.current && fadingOutgoingAudioRef.current !== outgoingAudio) {
+      try {
+        fadingOutgoingAudioRef.current.onended = null;
+        fadingOutgoingAudioRef.current.ontimeupdate = null;
+        fadingOutgoingAudioRef.current.onloadedmetadata = null;
+        fadingOutgoingAudioRef.current.onerror = null;
+        fadingOutgoingAudioRef.current.pause();
+        fadingOutgoingAudioRef.current.currentTime = 0;
+        fadingOutgoingAudioRef.current.removeAttribute('src');
+        fadingOutgoingAudioRef.current.load();
+        fadingOutgoingAudioRef.current.volume = 1.0;
+      } catch (_) {}
+    }
+    fadingOutgoingAudioRef.current = outgoingAudio;
+
+    incomingAudio.src = resolvedNextUrl;
+    incomingAudio.currentTime = 0;
+    incomingAudio.volume = 0;
+
+    sonaraAudioEngine.attachElement(incomingAudio);
+    sonaraAudioEngine.resume();
+
+    try {
+      await incomingAudio.play();
+    } catch (err) {
+      console.warn('Crossfade incoming playback failed:', err);
+      isCrossfadingRef.current = false;
+      return;
+    }
+
+    // SWAP primary audio reference to incomingAudio BEFORE state update
+    audioRef.current = incomingAudio;
+    crossfadeAudioRef.current = outgoingAudio;
+    lastTrackChangeAtRef.current = Date.now();
+    setTrackProgress(0);
+    setTrackDuration(0);
+
+    // Start equal-power fade out on outgoingAudio
+    let cancelOut = () => {};
+    if (outgoingAudio) {
+      cancelOut = fadeVolume(outgoingAudio, outgoingAudio.volume || 1.0, 0, fadeMs, () => {
+        try {
+          outgoingAudio.onended = null;
+          outgoingAudio.ontimeupdate = null;
+          outgoingAudio.onloadedmetadata = null;
+          outgoingAudio.onerror = null;
+          outgoingAudio.pause();
+          outgoingAudio.currentTime = 0;
+          outgoingAudio.removeAttribute('src');
+          outgoingAudio.load();
+          outgoingAudio.volume = 1.0;
+        } catch (_) {}
+        if (fadingOutgoingAudioRef.current === outgoingAudio) {
+          fadingOutgoingAudioRef.current = null;
+        }
+      });
+    }
+
+    // Start equal-power fade in on incomingAudio
+    const cancelIn = fadeVolume(incomingAudio, 0, 1.0, fadeMs, () => {
+      isCrossfadingRef.current = false;
+    });
+
+    fadeCancelRef.current = () => {
+      cancelOut();
+      cancelIn();
+    };
+
+    if (currentTrack && currentTrack.id !== next.id) {
+      playHistoryRef.current.push(currentTrack);
+      if (playHistoryRef.current.length > 50) playHistoryRef.current.shift();
+    }
+    setCurrentTrack(next);
+    setIsPlaying(true);
+    recordRecentlyPlayed(next);
+    updateMediaSession(next, true);
+  };
+
+  const startCrossfadeTransition = async (durationSec) => {
+    if (Capacitor.isNativePlatform()) {
+      return startNativeCrossfade(durationSec);
+    } else {
+      return startWebCrossfade(durationSec);
+    }
+  };
+
   const triggerNextTrackLogic = () => {
+    cleanupFadingAudio();
     const { songs: s, currentQueue: q, currentTrack: t, isShuffle: sh, autoplayInfinite: autoInf } = audioStateRef.current;
     const queue = q.length > 0 ? q : s;
     if (!queue.length) return;
@@ -812,30 +1350,45 @@ export default function App() {
             setIsPlaying(false);
             return;
           }
-          const remainingIds = queue.filter(track => track.id !== t?.id).map(track => track.id);
-          shuffleBagRef.current = shuffleArray(remainingIds);
+          const similar = findSimilarTrack(t, s, playHistoryRef.current);
+          if (similar && similar.id !== t?.id) {
+            next = similar;
+          } else {
+            const remainingIds = queue.filter(track => track.id !== t?.id).map(track => track.id);
+            shuffleBagRef.current = shuffleArray(remainingIds);
+            const nextId = shuffleBagRef.current.shift();
+            next = queue.find(track => track.id === nextId) || queue[0];
+          }
+        } else {
+          const nextId = shuffleBagRef.current.shift();
+          next = queue.find(track => track.id === nextId) || queue[0];
         }
-        const nextId = shuffleBagRef.current.shift();
-        next = queue.find(track => track.id === nextId) || queue[0];
       } else {
         if (!autoInf) {
           setIsPlaying(false);
           return;
         }
-        next = queue[0];
+        next = findSimilarTrack(t, s, playHistoryRef.current) || queue[0];
       }
     } else {
       const idx = queue.findIndex(track => track.id === t?.id);
-      if (!autoInf && idx === queue.length - 1) {
-        setIsPlaying(false);
-        return;
+      if (idx === queue.length - 1) {
+        if (!autoInf) {
+          setIsPlaying(false);
+          return;
+        }
+        next = findSimilarTrack(t, s, playHistoryRef.current) || queue[0];
+      } else {
+        next = queue[(idx + 1) % queue.length];
       }
-      next = queue[(idx + 1) % queue.length];
     }
-    handleTrackSelection(next, queue, false);
+    if (next) {
+      handleTrackSelection(next, queue, false);
+    }
   };
 
   const triggerPrevTrackLogic = () => {
+    cleanupFadingAudio();
     const { songs: s, currentQueue: q, currentTrack: t } = audioStateRef.current;
     const queue = q.length > 0 ? q : s;
     if (!queue.length) return;
@@ -920,11 +1473,12 @@ export default function App() {
     }
   };
 
-  const startNativeTrack = (track, autoplay = true) => {
+  const startNativeTrack = (track, autoplay = true, seekTime = 0) => {
     if (!track) return;
-    const url = getPlaybackSource(track);
+    const url = getPlaybackSource(track, { quality: streamingQuality });
     if (!url) return;
 
+    cleanupFadingAudio();
     if (mediaRef.current) {
       try { mediaRef.current.stop(); } catch (_) {}
       try { mediaRef.current.release(); } catch (_) {}
@@ -936,7 +1490,7 @@ export default function App() {
     }
 
     lastTrackChangeAtRef.current = Date.now();
-    setTrackProgress(0);
+    setTrackProgress(seekTime || 0);
     setTrackDuration(0);
     loadedNativeTrackIdRef.current = track.id;
 
@@ -948,9 +1502,12 @@ export default function App() {
       return;
     }
     mediaRef.current = media;
+    syncAllAudioEffectsToNative();
 
     media.onSuccess.subscribe(() => {
       if (loadedNativeTrackIdRef.current !== track.id) return;
+      if (isCrossfadingRef.current) return;
+      if (Date.now() - lastTrackChangeAtRef.current < 10000) return;
       const { isRepeat: r } = audioStateRef.current;
       if (r) {
         startNativeTrack(track, true);
@@ -967,6 +1524,11 @@ export default function App() {
 
     if (autoplay) {
       media.play();
+      if (seekTime > 0 && typeof media.seekTo === 'function') {
+        setTimeout(() => {
+          try { media.seekTo(seekTime * 1000); } catch (_) {}
+        }, 150);
+      }
     }
 
     nativeProgressIntervalRef.current = setInterval(() => {
@@ -983,6 +1545,17 @@ export default function App() {
             if (Capacitor.isNativePlatform() && dur > 0) {
               MediaSession.setPositionState({ duration: dur, playbackRate: 1.0, position: pos }).catch(() => {});
             }
+
+            // Native Crossfade transition check (only when playing for at least 15s)
+            const { crossfadeEnabled: cfOn, crossfadeDuration: cfDur, isRepeat: r } = audioStateRef.current;
+            if (cfOn && cfDur !== 'Off' && !r && !isCrossfadingRef.current && dur > 8 && (Date.now() - lastTrackChangeAtRef.current > 15000)) {
+              const durSec = parseInt(cfDur, 10) || 0;
+              const timeLeft = dur - pos;
+              if (durSec > 0 && timeLeft <= durSec && timeLeft > 0.4) {
+                isCrossfadingRef.current = true;
+                startNativeCrossfade(durSec);
+              }
+            }
           }
         }).catch(() => {});
       }
@@ -991,6 +1564,7 @@ export default function App() {
 
   useEffect(() => {
     return () => {
+      cleanupFadingAudio();
       if (nativeProgressIntervalRef.current) clearInterval(nativeProgressIntervalRef.current);
       if (mediaRef.current) {
         try { mediaRef.current.stop(); } catch (_) {}
@@ -1126,7 +1700,7 @@ export default function App() {
       updateMediaSession(null, false);
       return;
     }
-    const trackUrl = getPlaybackSource(currentTrack);
+    const trackUrl = getPlaybackSource(currentTrack, { quality: streamingQuality });
     if (!trackUrl) return;
 
     if (Capacitor.isNativePlatform()) {
@@ -1136,9 +1710,13 @@ export default function App() {
 
     if (!audioRef.current) {
       audioRef.current = new Audio();
+      audioRef.current.crossOrigin = 'anonymous';
       audioRef.current.setAttribute('playsinline', '');
       audioRef.current.setAttribute('webkit-playsinline', '');
     }
+
+    // Attach to Web Audio DSP Engine (EQ, 3D Spatial, Dolby Atmos, and Compressor Normalization)
+    sonaraAudioEngine.attachElement(audioRef.current);
 
     const resolvedUrl = new URL(trackUrl, window.location.href).href;
     if (audioRef.current.src !== resolvedUrl) {
@@ -1152,15 +1730,35 @@ export default function App() {
 
     updateMediaSession(currentTrack, isPlaying);
 
-    const handleTimeUpdate = () => {
-      setTrackProgress(audioRef.current.currentTime);
+    const boundAudio = audioRef.current;
+
+    const handleTimeUpdate = (e) => {
+      if (e?.target && e.target !== audioRef.current) return;
+      const audio = audioRef.current;
+      if (!audio) return;
+      setTrackProgress(audio.currentTime);
+
+      // Check for Crossfade transition (only after track has played for at least 15s)
+      const { crossfadeEnabled: cfOn, crossfadeDuration: cfDur, isRepeat: r } = audioStateRef.current;
+      if (cfOn && cfDur !== 'Off' && !r && !isCrossfadingRef.current && audio.duration > 8 && (Date.now() - lastTrackChangeAtRef.current > 15000)) {
+        const durSec = parseInt(cfDur, 10) || 0;
+        const timeLeft = audio.duration - audio.currentTime;
+        if (durSec > 0 && timeLeft <= durSec && timeLeft > 0.4) {
+          isCrossfadingRef.current = true;
+          startCrossfadeTransition(durSec);
+        }
+      }
     };
 
-    const handleLoadedMetadata = () => {
+    const handleLoadedMetadata = (e) => {
+      if (e?.target && e.target !== audioRef.current) return;
       setTrackDuration(audioRef.current.duration);
     };
 
-    const handleEnded = () => {
+    const handleEnded = (e) => {
+      if (e?.target && e.target !== audioRef.current) return;
+      if (isCrossfadingRef.current) return;
+      if (Date.now() - lastTrackChangeAtRef.current < 10000) return;
       if (sleepTimeLeft === 'end_of_song' || sleepTimeLeft === 0) {
         setIsPlaying(false);
         setSleepTimeLeft(null);
@@ -1176,16 +1774,16 @@ export default function App() {
       }
     };
 
-    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-    audioRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audioRef.current.addEventListener('ended', handleEnded);
+    boundAudio.addEventListener('timeupdate', handleTimeUpdate);
+    boundAudio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    boundAudio.addEventListener('ended', handleEnded);
 
     calculateAndPrefetchNextTrack();
 
     return () => {
-      audioRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
-      audioRef.current?.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audioRef.current?.removeEventListener('ended', handleEnded);
+      boundAudio?.removeEventListener('timeupdate', handleTimeUpdate);
+      boundAudio?.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      boundAudio?.removeEventListener('ended', handleEnded);
     };
   }, [currentTrack]);
 
@@ -1200,8 +1798,14 @@ export default function App() {
       } else if (mediaRef.current) {
         if (isPlaying) {
           mediaRef.current.play();
+          if (fadingNativeMediaRef.current) {
+            try { fadingNativeMediaRef.current.play(); } catch (_) {}
+          }
         } else {
           mediaRef.current.pause();
+          if (fadingNativeMediaRef.current) {
+            try { fadingNativeMediaRef.current.pause(); } catch (_) {}
+          }
         }
         MediaSession.setPlaybackState({
           playbackState: isPlaying ? 'playing' : 'paused',
@@ -1214,14 +1818,22 @@ export default function App() {
     if (!audioRef.current || !audioRef.current.src) return;
 
     if (isPlaying) {
+      sonaraAudioEngine.attachElement(audioRef.current);
+      sonaraAudioEngine.resume();
       audioRef.current.play()
         .then(() => {
           if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
         })
         .catch(err => console.warn('Stream buffering:', err));
+      if (fadingOutgoingAudioRef.current) {
+        try { fadingOutgoingAudioRef.current.play(); } catch (_) {}
+      }
     } else {
       audioRef.current.pause();
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+      if (fadingOutgoingAudioRef.current) {
+        try { fadingOutgoingAudioRef.current.pause(); } catch (_) {}
+      }
     }
   }, [isPlaying, currentTrack]);
 
@@ -1263,7 +1875,7 @@ export default function App() {
       nextTrackRef.current = next;
       const rawNextUrl = next.songUrl || next.audioUrl;
       if (rawNextUrl) {
-        const nextUrl = appendQualityParam(rawNextUrl, getStreamingQuality());
+        const nextUrl = applyQualityToUrl(rawNextUrl, streamingQuality);
         if (!prefetchAudioRef.current) prefetchAudioRef.current = new Audio();
         prefetchAudioRef.current.src = nextUrl;
         prefetchAudioRef.current.preload = 'auto';
@@ -1293,6 +1905,7 @@ export default function App() {
   const togglePlayPause = () => setIsPlaying(prev => !prev);
 
   const handleSeekProgress = (newTime) => {
+    cleanupFadingAudio();
     setTrackProgress(newTime);
 
     if (Capacitor.isNativePlatform()) {
@@ -1319,6 +1932,7 @@ export default function App() {
 
   const handleTrackSelection = async (track, customQueue = null, resetBag = true) => {
     if (!track) return;
+    cleanupFadingAudio();
 
     // 🛡️ Strict Offline Only Mode enforcement
     if (offlineOnlyMode && !isTrackCachedOffline(track.id)) {
@@ -1476,20 +2090,51 @@ export default function App() {
     await signOut(auth);
   };
 
-  const createPlaylist = async (name) => {
+  const createPlaylist = async (name, initialSongs = []) => {
     if (!name.trim()) return;
     try {
-      await addDoc(collection(db, 'playlists'), {
-        playlistName: name,
+      const docRef = await addDoc(collection(db, 'playlists'), {
+        playlistName: name.trim(),
         uid: user.uid,
         user: user.displayName || 'User',
         email: user.email,
         createdAt: new Date().toISOString(),
       });
-      showToast(`Playlist "${name.trim()}" created!`, 'success', 'fa-folder-plus');
+      if (Array.isArray(initialSongs) && initialSongs.length > 0) {
+        for (let i = 0; i < initialSongs.length; i++) {
+          const song = initialSongs[i];
+          const songId = song.title || song.name;
+          if (songId) {
+            await addDoc(collection(db, 'playlistSongs'), {
+              playlistId: docRef.id,
+              songId,
+              orderPosition: i
+            });
+          }
+        }
+      }
+      showToast(
+        `Playlist "${name.trim()}" created${initialSongs.length > 0 ? ` with ${initialSongs.length} track${initialSongs.length > 1 ? 's' : ''}` : ''}!`,
+        'success',
+        'fa-folder-plus'
+      );
     } catch (err) { 
       console.error(err);
       showToast('Failed to create playlist', 'error', 'fa-circle-xmark');
+    }
+  };
+
+  const renamePlaylist = async (playlistId, newName) => {
+    if (!newName?.trim()) return;
+    try {
+      await updateDoc(doc(db, 'playlists', playlistId), {
+        playlistName: newName.trim(),
+        updatedAt: new Date().toISOString(),
+      });
+      showToast(`Playlist renamed to "${newName.trim()}"`, 'success', 'fa-pen-to-square');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to rename playlist', 'error', 'fa-circle-xmark');
     }
   };
 
@@ -1539,29 +2184,71 @@ export default function App() {
       showToast("Album details couldn't be found.", "error", "fa-circle-xmark");
       return;
     }
-    setSelectedAlbum(album);
-    setSelectedArtist(null);
-    setSelectedGenre(null);
-    setCurrentView('home');
+    openDetailView({ album });
     setShowFullPlayer(false);
   };
 
   const handleGoToArtist = (track) => {
-    if (!track?.artist) {
+    if (!track?.artist && typeof track !== 'string') {
       showToast("This track isn't linked to an artist.", "info", "fa-circle-info");
       return;
     }
-    const credits = splitArtistCredits(track.artist).map(c => c.toLowerCase());
-    const artist = artists.find(a => credits.includes((a.name || '').toLowerCase()));
+    const artistName = typeof track === 'string' ? track : track.artist;
+    const credits = splitArtistCredits(artistName).map(c => c.toLowerCase());
+    const artist = artists.find(a => credits.includes((a.name || '').toLowerCase()) || (a.name || '').toLowerCase() === artistName.toLowerCase());
     if (!artist) {
+      const partial = artists.find(a => artistName.toLowerCase().includes((a.name || '').toLowerCase()));
+      if (partial) {
+        openDetailView({ artist: partial });
+        setShowFullPlayer(false);
+        return;
+      }
       showToast("Artist profile couldn't be found.", "error", "fa-circle-xmark");
       return;
     }
-    setSelectedArtist(artist);
-    setSelectedAlbum(null);
-    setSelectedGenre(null);
-    setCurrentView('home');
+    openDetailView({ artist });
     setShowFullPlayer(false);
+  };
+
+  const handlePlayNext = (trackOrTracks) => {
+    if (!trackOrTracks) return;
+    const items = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks];
+    if (items.length === 0) return;
+    setCurrentQueue((prev) => {
+      const idx = prev.findIndex(t => t.id === currentTrack?.id);
+      if (idx !== -1) {
+        const next = [...prev];
+        next.splice(idx + 1, 0, ...items);
+        return next;
+      }
+      return [...items, ...prev];
+    });
+    showToast(
+      items.length === 1 
+        ? `Playing next: ${items[0].title || items[0].name}` 
+        : `Playing next: ${items.length} tracks`,
+      'info',
+      'fa-forward-step'
+    );
+  };
+
+  const handleAddToQueue = (trackOrTracks) => {
+    if (!trackOrTracks) return;
+    const items = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks];
+    if (items.length === 0) return;
+    setCurrentQueue((prev) => [...prev, ...items]);
+    showToast(
+      items.length === 1 
+        ? `Added to queue: ${items[0].title || items[0].name}` 
+        : `Added ${items.length} tracks to queue`,
+      'success',
+      'fa-layer-group'
+    );
+  };
+
+  const handleOpenSongMenu = (song, playlistId = null) => {
+    setActionSheetSong(song);
+    setActionSheetPlaylistId(playlistId);
   };
 
   const handleUpdateProfile = async (updates) => {
@@ -1646,17 +2333,20 @@ export default function App() {
 
       <Header 
         user={user} 
-        onOpenProfile={() => setShowProfile(true)} 
-        onOpenNotifications={() => setShowNotifications(true)} 
-        onOpenDownloads={() => setShowDownloads(true)}
-        hasUnreadNotifications={hasUnreadNotifications}
-        onViewChange={(view) => {
-          setCurrentView(view);
-          setSelectedAlbum(null);
-          setSelectedArtist(null);
-          setSelectedGenre(null);
-          setSelectedPlaylist(null);
+        onOpenProfile={() => {
+          setShowProfile(true);
+          try { window.history.pushState({ sonaraNav: true }, ''); } catch (_) {}
         }} 
+        onOpenNotifications={() => {
+          setShowNotifications(true);
+          try { window.history.pushState({ sonaraNav: true }, ''); } catch (_) {}
+        }} 
+        onOpenDownloads={() => {
+          setShowDownloads(true);
+          try { window.history.pushState({ sonaraNav: true }, ''); } catch (_) {}
+        }}
+        hasUnreadNotifications={hasUnreadNotifications}
+        onViewChange={handleTabChange} 
       />
 
       {!isOnline && (
@@ -1670,17 +2360,10 @@ export default function App() {
         </div>
       )}
 
-      {currentView === 'home' && (
-        <main className="mobile-content" style={(selectedAlbum || selectedArtist || selectedGenre) ? { padding: 0 } : {}}>
-          {!isOnline ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center', padding: '0 24px' }}>
-              <i className="fa-solid fa-wifi" style={{ fontSize: '2.4rem', color: 'var(--text-muted)', marginBottom: '16px' }}></i>
-              <h3 style={{ color: '#ffffff', margin: '0 0 8px 0' }}>No Internet Available</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
-                Home needs a connection to load new content. Check your Library's Downloaded tab to play music offline.
-              </p>
-            </div>
-          ) : selectedAlbum ? (
+      {/* 🌟 Top-Level Detail View Layer (Album, Artist, Genre) */}
+      {(selectedAlbum || selectedArtist || selectedGenre) ? (
+        <main className="mobile-content" style={{ padding: 0 }}>
+          {selectedAlbum ? (
             <AlbumDetailsView
               album={selectedAlbum}
               songs={songs}
@@ -1691,11 +2374,13 @@ export default function App() {
               onToggleShuffle={toggleShuffle}
               onTogglePlay={togglePlayPause}
               onSelectTrack={handleTrackSelection}
-              onSelectArtist={(artist) => {
-                setSelectedAlbum(null);
-                setSelectedArtist(artist);
-              }}
-              onBack={() => setSelectedAlbum(null)}
+              onSelectArtist={(artist) => openDetailView({ artist })}
+              onOpenSongMenu={handleOpenSongMenu}
+              onAddToQueue={handleAddToQueue}
+              onPlayNext={handlePlayNext}
+              playlists={playlists}
+              onAddSongToPlaylist={addSongToPlaylist}
+              onBack={handleAppBack}
             />
           ) : selectedArtist ? (
             <ArtistDetailsView
@@ -1708,10 +2393,11 @@ export default function App() {
               onToggleShuffle={toggleShuffle}
               onTogglePlay={togglePlayPause}
               onSelectTrack={handleTrackSelection}
-              onSelectArtist={setSelectedArtist}
+              onSelectArtist={(artist) => openDetailView({ artist })}
               likedSongIds={likedSongIds}
               onToggleLike={toggleLikeSong}
-              onBack={() => setSelectedArtist(null)}
+              onOpenSongMenu={handleOpenSongMenu}
+              onBack={handleAppBack}
             />
           ) : selectedGenre ? (
             <GenreDetailsView
@@ -1722,50 +2408,65 @@ export default function App() {
               likedSongIds={likedSongIds}
               onToggleLike={toggleLikeSong}
               onSelectTrack={handleTrackSelection}
-              onBack={() => setSelectedGenre(null)}
+              onOpenSongMenu={handleOpenSongMenu}
+              onBack={handleAppBack}
             />
-          ) : (
-            <>
-              {/* 🌟 Dynamic Greeting Header */}
-              <div className="home-greeting-container">
-                <div className="home-greeting-subtitle">
-                  <i className="fa-solid fa-sparkles"></i> Welcome to Sonara
+          ) : null}
+        </main>
+      ) : (
+        <>
+          {currentView === 'home' && (
+            <main className="mobile-content">
+              {!isOnline ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center', padding: '0 24px' }}>
+                  <i className="fa-solid fa-wifi" style={{ fontSize: '2.4rem', color: 'var(--text-muted)', marginBottom: '16px' }}></i>
+                  <h3 style={{ color: '#ffffff', margin: '0 0 8px 0' }}>No Internet Available</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+                    Home needs a connection to load new content. Check your Library's Downloaded tab to play music offline.
+                  </p>
                 </div>
-                <h1 className="home-greeting-title">
-                  {greetingText}{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}
-                </h1>
-              </div>
+              ) : (
+                <>
+                  {/* 🌟 Dynamic Greeting Header */}
+                  <div className="home-greeting-container">
+                    <div className="home-greeting-subtitle">
+                      <i className="fa-solid fa-wand-magic-sparkles"></i> Welcome to Sonara
+                    </div>
+                    <h1 className="home-greeting-title">
+                      {greetingText}{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}
+                    </h1>
+                  </div>
 
-              {/* 🌟 Quick Filter Chips */}
-              <div className="quick-filters-scroll">
-                {[
-                  { id: 'All', label: 'All', icon: 'fa-globe' },
-                  { id: 'Trending', label: 'Trending', icon: 'fa-arrow-trend-up' },
-                  { id: 'Melody', label: 'Melody', icon: 'fa-headphones' },
-                  { id: 'Party', label: 'Party', icon: 'fa-sparkles' },
-                  { id: 'Kollywood', label: 'Kollywood', icon: 'fa-fire' },
-                  { id: 'Chill', label: 'Chill', icon: 'fa-mug-hot' },
-                  { id: 'Devotional', label: 'Devotional', icon: 'fa-hands-praying' },
-                  { id: 'Love', label: 'Love', icon: 'fa-heart' }
-                ].map((chip) => (
-                  <button
-                    key={chip.id}
-                    onClick={() => {
-                      if (chip.id === 'All') {
-                        setHomeFilter('All');
-                      } else if (chip.id === 'Trending') {
-                        setHomeFilter(homeFilter === 'Trending' ? 'All' : 'Trending');
-                      } else {
-                        setSelectedGenre(chip.id);
-                      }
-                    }}
-                    className={`quick-filter-chip ${homeFilter === chip.id ? 'active' : ''}`}
-                  >
-                    <i className={`fa-solid ${chip.icon}`}></i>
-                    {chip.label}
-                  </button>
-                ))}
-              </div>
+                  {/* 🌟 Quick Filter Chips */}
+                  <div className="quick-filters-scroll">
+                    {[
+                      { id: 'All', label: 'All', icon: 'fa-globe' },
+                      { id: 'Trending', label: 'Trending', icon: 'fa-arrow-trend-up' },
+                      { id: 'Melody', label: 'Melody', icon: 'fa-headphones' },
+                      { id: 'Party', label: 'Party', icon: 'fa-champagne-glasses' },
+                      { id: 'Kollywood', label: 'Kollywood', icon: 'fa-fire' },
+                      { id: 'Chill', label: 'Chill', icon: 'fa-mug-hot' },
+                      { id: 'Devotional', label: 'Devotional', icon: 'fa-hands-praying' },
+                      { id: 'Love', label: 'Love', icon: 'fa-heart' }
+                    ].map((chip) => (
+                      <button
+                        key={chip.id}
+                        onClick={() => {
+                          if (chip.id === 'All') {
+                            setHomeFilter('All');
+                          } else if (chip.id === 'Trending') {
+                            setHomeFilter(homeFilter === 'Trending' ? 'All' : 'Trending');
+                          } else {
+                            openDetailView({ genre: chip.id });
+                          }
+                        }}
+                        className={`quick-filter-chip ${homeFilter === chip.id ? 'active' : ''}`}
+                      >
+                        <i className={`fa-solid ${chip.icon}`}></i>
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
 
               {/* 🌟 Recently Played Row */}
               {recentlyPlayed.length > 0 && (
@@ -1832,7 +2533,7 @@ export default function App() {
                   {[
                     { name: 'Kollywood', bg: 'linear-gradient(135deg, #f43f5e 0%, #be123c 60%, #881337 100%)', icon: 'fa-fire', tag: 'Trending' },
                     { name: 'Melody', bg: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 60%, #1e3a8a 100%)', icon: 'fa-headphones', tag: 'Vibe' },
-                    { name: 'Party', bg: 'linear-gradient(135deg, #c084fc 0%, #9333ea 60%, #581c87 100%)', icon: 'fa-compact-disc', tag: 'Dance' },
+                    { name: 'Party', bg: 'linear-gradient(135deg, #c084fc 0%, #9333ea 60%, #581c87 100%)', icon: 'fa-champagne-glasses', tag: 'Dance' },
                     { name: 'Chill', bg: 'linear-gradient(135deg, #34d399 0%, #059669 60%, #064e3b 100%)', icon: 'fa-mug-hot', tag: 'Relax' },
                     { name: 'Love', bg: 'linear-gradient(135deg, #fb7185 0%, #e11d48 60%, #9f1239 100%)', icon: 'fa-heart', tag: 'Romance' },
                     { name: 'Devotional', bg: 'linear-gradient(135deg, #fbbf24 0%, #d97706 60%, #78350f 100%)', icon: 'fa-hands-praying', tag: 'Peace' },
@@ -1843,7 +2544,7 @@ export default function App() {
                   ].map((genre) => (
                     <div
                       key={genre.name}
-                      onClick={() => setSelectedGenre(genre.name)}
+                      onClick={() => openDetailView({ genre: genre.name })}
                       className="genre-mesh-card"
                       style={{ background: genre.bg }}
                     >
@@ -1861,13 +2562,24 @@ export default function App() {
                 likedSongIds={likedSongIds}
                 onToggleLike={toggleLikeSong}
                 onSelectTrack={(track) => handleTrackSelection(track, songs)}
-                onSeeAll={() => setCurrentView('all-songs')}
+                onSeeAll={() => {
+                  tabHistoryRef.current.push(currentView);
+                  setCurrentView('all-songs');
+                  try { window.history.pushState({ sonaraNav: true }, ''); } catch (_) {}
+                }}
               />
 
               <section className="content-section" style={{ marginBottom: '24px' }}>
                 <div className="section-header-container">
                   <h2>Popular Albums</h2>
-                  <button className="see-all-action-btn" onClick={() => setCurrentView('all-albums')}>
+                  <button
+                    className="see-all-action-btn"
+                    onClick={() => {
+                      tabHistoryRef.current.push(currentView);
+                      setCurrentView('all-albums');
+                      try { window.history.pushState({ sonaraNav: true }, ''); } catch (_) {}
+                    }}
+                  >
                     See all
                   </button>
                 </div>
@@ -1877,7 +2589,7 @@ export default function App() {
                       <div 
                         key={album.id} 
                         className="song-card" 
-                        onClick={() => setSelectedAlbum(album)}
+                        onClick={() => openDetailView({ album })}
                         style={{ cursor: 'pointer' }}
                       >
                         <div className="img-container">
@@ -1896,8 +2608,12 @@ export default function App() {
               <ArtistRow
                 title="Popular Artists"
                 artists={artists}
-                onSelectArtist={(artist) => setSelectedArtist(artist)}
-                onSeeAll={() => setCurrentView('all-artists')}
+                onSelectArtist={(artist) => openDetailView({ artist })}
+                onSeeAll={() => {
+                  tabHistoryRef.current.push(currentView);
+                  setCurrentView('all-artists');
+                  try { window.history.pushState({ sonaraNav: true }, ''); } catch (_) {}
+                }}
               />
             </>
           )}
@@ -1912,29 +2628,24 @@ export default function App() {
           likedSongIds={likedSongIds}
           onToggleLike={toggleLikeSong}
           onSelectTrack={(track) => handleTrackSelection(track, songs)}
-          onBack={() => setCurrentView('home')}
+          onOpenSongMenu={handleOpenSongMenu}
+          onBack={handleAppBack}
         />
       )}
 
       {currentView === 'all-albums' && (
         <AllAlbumsView
           albums={albums}
-          onSelectAlbum={(album) => {
-            setSelectedAlbum(album);
-            setCurrentView('home');
-          }}
-          onBack={() => setCurrentView('home')}
+          onSelectAlbum={(album) => openDetailView({ album })}
+          onBack={handleAppBack}
         />
       )}
 
       {currentView === 'all-artists' && (
         <AllArtistsView
           artists={artists}
-          onSelectArtist={(artist) => {
-            setSelectedArtist(artist);
-            setCurrentView('home');
-          }}
-          onBack={() => setCurrentView('home')}
+          onSelectArtist={(artist) => openDetailView({ artist })}
+          onBack={handleAppBack}
         />
       )}
 
@@ -1959,19 +2670,10 @@ export default function App() {
             likedSongIds={likedSongIds}
             onToggleLike={toggleLikeSong}
             onSelectTrack={(track) => handleTrackSelection(track, songs)}
-            onSelectAlbum={(album) => {
-              setSelectedAlbum(album);
-              setSelectedArtist(null);
-              setSelectedGenre(null);
-              setCurrentView('home');
-            }}
-            onSelectArtist={(artist) => {
-              setSelectedArtist(artist);
-              setSelectedAlbum(null);
-              setSelectedGenre(null);
-              setCurrentView('home');
-            }}
+            onSelectAlbum={(album) => openDetailView({ album })}
+            onSelectArtist={(artist) => openDetailView({ artist })}
             onAddSongToPlaylist={addSongToPlaylist}
+            onOpenSongMenu={handleOpenSongMenu}
           />
         )
       )}
@@ -1992,25 +2694,30 @@ export default function App() {
           onCreatePlaylist={createPlaylist}
           onDeletePlaylist={deletePlaylist}
           onRemoveSong={removeSongFromPlaylist}
-          onSelectArtist={(artist) => {
-            setSelectedArtist(artist);
-            setSelectedAlbum(null);
-            setSelectedGenre(null);
-            setCurrentView('home');
-          }}
-          onSelectAlbum={(album) => {
-            setSelectedAlbum(album);
-            setSelectedArtist(null);
-            setSelectedGenre(null);
-            setCurrentView('home');
-          }}
+          onAddSongToPlaylist={addSongToPlaylist}
+          onRenamePlaylist={renamePlaylist}
+          onOpenSongMenu={handleOpenSongMenu}
+          onSelectArtist={(artist) => openDetailView({ artist })}
+          onSelectAlbum={(album) => openDetailView({ album })}
           activeTab={libraryActiveTab}
           onActiveTabChange={setLibraryActiveTab}
           selectedPlaylist={selectedPlaylist}
-          onSelectPlaylist={setSelectedPlaylist}
+          onSelectPlaylist={(p) => {
+            if (typeof p === 'function') {
+              setSelectedPlaylist(p);
+            } else if (p) {
+              openDetailView({ playlist: p });
+            } else {
+              handleAppBack();
+            }
+          }}
           isOffline={!isOnline}
         />
       )}
+        </>
+      )}
+
+
 
 
 
@@ -2059,7 +2766,7 @@ export default function App() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h2 style={{ color: '#fff', margin: 0, fontSize: '1.25rem' }}>Up Next / Queue</h2>
-            <button onClick={() => setShowQueueModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>
+            <button onClick={handleAppBack} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>
               <i className="fa-solid fa-xmark"></i>
             </button>
           </div>
@@ -2108,6 +2815,10 @@ export default function App() {
           trackDuration={trackDuration}
           lyricsSize={lyricsSize}
           audioRoute={audioRoute}
+          streamingQuality={streamingQuality}
+          downloadQuality={downloadQuality}
+          dolbyAtmos={dolbyAtmos}
+          spatialAudio={spatialAudio}
           isLiked={Boolean(currentTrack && likedSongIds.includes(currentTrack.id))}
           onToggleLike={(e) => toggleLikeSong(currentTrack, e)}
           onTogglePlay={togglePlayPause}
@@ -2121,7 +2832,7 @@ export default function App() {
           onGoToAlbum={handleGoToAlbum}
           onGoToArtist={handleGoToArtist}
           onOpenQueue={() => setShowQueueModal(true)}
-          onClose={() => setShowFullPlayer(false)}
+          onClose={handleAppBack}
         />
       )}
 
@@ -2152,7 +2863,7 @@ export default function App() {
           onUpdateProfile={handleUpdateProfile}
           showAboutModal={showAboutModal}
           setShowAboutModal={setShowAboutModal}
-          onClose={() => setShowProfile(false)}
+          onClose={handleAppBack}
         />
       )}
 
@@ -2168,7 +2879,7 @@ export default function App() {
             setCurrentView('home');
             setShowNotifications(false);
           }}
-          onClose={() => setShowNotifications(false)}
+          onClose={handleAppBack}
         />
       )}
 
@@ -2176,9 +2887,14 @@ export default function App() {
         <DownloadCenterView
           currentTrack={currentTrack}
           isPlaying={isPlaying}
+          downloadQuality={downloadQuality}
           onSelectTrack={handleTrackSelection}
           onTogglePlay={togglePlayPause}
-          onClose={() => setShowDownloads(false)}
+          onOpenSettings={() => {
+            setShowDownloads(false);
+            setShowSettings(true);
+          }}
+          onClose={handleAppBack}
         />
       )}
 
@@ -2210,6 +2926,14 @@ export default function App() {
             setAutomaticallySendDiagnostics={setAutomaticallySendDiagnostics}
             crossfadeEnabled={crossfadeEnabled}
             setCrossfadeEnabled={setCrossfadeEnabled}
+            crossfadeDuration={crossfadeDuration}
+            setCrossfadeDuration={setCrossfadeDuration}
+            gaplessPlayback={gaplessPlayback}
+            setGaplessPlayback={setGaplessPlayback}
+            automixEnabled={automixEnabled}
+            setAutomixEnabled={setAutomixEnabled}
+            dolbyAtmos={dolbyAtmos}
+            setDolbyAtmos={setDolbyAtmos}
             playbackSpeed={playbackSpeed}
             setPlaybackSpeed={setPlaybackSpeed}
             normalizeVolume={normalizeVolume}
@@ -2226,9 +2950,15 @@ export default function App() {
             setEqPreset={setEqPreset}
             sleepTimeLeft={sleepTimeLeft}
             onSetSleepTimer={setSleepTimeLeft}
+            streamingQuality={streamingQuality}
+            setStreamingQuality={setStreamingQualityVal}
+            downloadQuality={downloadQuality}
+            setDownloadQuality={setDownloadQualityVal}
+            originIslandActive={originIslandActive}
+            setOriginIslandActive={setOriginIslandActive}
             currentVersion={CURRENT_APP_VERSION}
             songs={songs}
-            onBack={() => setShowSettings(false)}
+            onBack={handleAppBack}
           />
         </div>
       )}
@@ -2236,7 +2966,7 @@ export default function App() {
       {showUploadSong && (
         <UploadSongView
           user={user}
-          onBack={() => setShowUploadSong(false)}
+          onBack={handleAppBack}
           onSongUploaded={(newSong) => setSongs((prev) => [newSong, ...prev])}
         />
       )}
@@ -2245,7 +2975,7 @@ export default function App() {
         <ManageAlbumsView
           albums={albums}
           songs={songs}
-          onBack={() => setShowManageAlbums(false)}
+          onBack={handleAppBack}
           onAlbumCreated={(newAlbum) => setAlbums((prev) => [newAlbum, ...prev])}
           onSongUpdated={(updatedSong) => {
             setSongs((prev) => prev.map(s => s.id === updatedSong.id ? updatedSong : s));
@@ -2257,7 +2987,7 @@ export default function App() {
       {showManageArtists && (
         <ManageArtistsView
           artists={artists}
-          onBack={() => setShowManageArtists(false)}
+          onBack={handleAppBack}
           onArtistCreated={(newArtist) => setArtists((prev) => [newArtist, ...prev])}
         />
       )}
@@ -2266,7 +2996,7 @@ export default function App() {
         <ManageLyricsView
           songs={songs}
           lyrics={lyrics}
-          onBack={() => setShowManageLyrics(false)}
+          onBack={handleAppBack}
           onLyricsSaved={(savedLyric) => {
             setLyrics((prev) => {
               const idx = prev.findIndex(l => l.id === savedLyric.id);
@@ -2284,7 +3014,7 @@ export default function App() {
       {showManageGenres && (
         <ManageGenresView
           songs={songs}
-          onBack={() => setShowManageGenres(false)}
+          onBack={handleAppBack}
           onGenreSaved={(updatedSong) => {
             setSongs((prev) => prev.map(s => s.id === updatedSong.id ? updatedSong : s));
             setCurrentTrack((prev) => (prev && prev.id === updatedSong.id) ? { ...prev, ...updatedSong } : prev);
@@ -2295,7 +3025,7 @@ export default function App() {
       {showManageSongs && (
         <ManageSongsAdminView
           songs={songs}
-          onBack={() => setShowManageSongs(false)}
+          onBack={handleAppBack}
           onSongDeleted={(deletedId) => {
             setSongs((prev) => prev.filter(s => s.id !== deletedId));
           }}
@@ -2305,7 +3035,7 @@ export default function App() {
       {showManageCanvas && (
         <ManageCanvasVideosView
           songs={songs}
-          onBack={() => setShowManageCanvas(false)}
+          onBack={handleAppBack}
           onSongUpdated={(updatedSong) => {
             setSongs((prev) => prev.map(s => s.id === updatedSong.id ? updatedSong : s));
             // Keep the currently-playing track in sync too, otherwise FullPlayerView
@@ -2317,7 +3047,29 @@ export default function App() {
         />
       )}
 
-      <BottomNavigation currentView={currentView} onViewChange={setCurrentView} isOnline={isOnline} />
+      {actionSheetSong && (
+        <SongActionSheet
+          song={actionSheetSong}
+          onClose={() => {
+            setActionSheetSong(null);
+            setActionSheetPlaylistId(null);
+          }}
+          onSelectTrack={(track) => handleTrackSelection(track, songs)}
+          onPlayNext={handlePlayNext}
+          onAddToQueue={handleAddToQueue}
+          isLiked={likedSongIds.includes(actionSheetSong.id)}
+          onToggleLike={toggleLikeSong}
+          playlists={playlists}
+          playlistSongs={playlistSongs}
+          onAddToPlaylist={addSongToPlaylist}
+          onGoToAlbum={handleGoToAlbum}
+          onGoToArtist={handleGoToArtist}
+          onRemoveFromPlaylist={removeSongFromPlaylist}
+          currentPlaylistId={actionSheetPlaylistId}
+        />
+      )}
+
+      <BottomNavigation currentView={currentView} onViewChange={handleTabChange} isOnline={isOnline} />
     </div>
   );
 }

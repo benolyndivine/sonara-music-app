@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { downloadTrackToDevice, isTrackCachedOffline } from '../utils/offlineStorage';
 import CachedImage from './CachedImage';
 
-export default function AllSongsView({ songs, currentTrack, isPlaying, onSelectTrack, onBack }) {
+export default function AllSongsView({ songs, currentTrack, isPlaying, onSelectTrack, onBack, onOpenSongMenu }) {
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [downloadedMap, setDownloadedMap] = useState({});
   const [toastMessage, setToastMessage] = useState(null);
@@ -112,29 +112,14 @@ export default function AllSongsView({ songs, currentTrack, isPlaying, onSelectT
               </div>
 
               <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                <button className="track-options-btn" onClick={() => setActiveDropdown(activeDropdown === song.id ? null : song.id)}><i className="fa-solid fa-ellipsis-vertical"></i></button>
-                
-                {activeDropdown === song.id && (
-                  <div className="premium-dropdown-menu" style={{ right: '10px', top: '30px', position: 'absolute', zIndex: 500 }}>
-                    <button 
-                      onClick={(e) => handleDownloadClick(e, song)} 
-                      className="dropdown-playlist-option" 
-                      style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: dlState === true ? 'var(--accent)' : '#ffffff' }}
-                    >
-                      <i className={dlState === 'loading' ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"} style={{ color: dlState === true ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}></i>
-                      <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Song'}</span>
-                    </button>
-
-                    <button 
-                      onClick={(e) => handleShareSong(e, song)} 
-                      className="dropdown-playlist-option" 
-                      style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: '#ffffff' }}
-                    >
-                      <i className="fa-solid fa-share-nodes" style={{ color: 'rgba(255,255,255,0.6)' }}></i>
-                      <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Share Song</span>
-                    </button>
-                  </div>
-                )}
+                <button
+                  className="track-options-btn"
+                  onClick={() => onOpenSongMenu ? onOpenSongMenu(song) : setActiveDropdown(activeDropdown === song.id ? null : song.id)}
+                  style={{ padding: '8px' }}
+                  title="Song options"
+                >
+                  <i className="fa-solid fa-ellipsis-vertical"></i>
+                </button>
               </div>
             </div>
           );

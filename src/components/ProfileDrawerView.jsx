@@ -63,10 +63,21 @@ export default function ProfileDrawerView({
 
   // 👑 Admin Publish Update States
   const [showPublishModal, setShowPublishModal] = useState(false);
-  const [pubVersion, setPubVersion] = useState('1.4.6');
+  const [pubVersion, setPubVersion] = useState('1.5.1');
   const [pubNotes, setPubNotes] = useState('Full Screen Edge-to-Edge, Android Back Button Navigation, and Download Center UI Polish!');
   const [pubUrl, setPubUrl] = useState('https://github.com');
   const [isPublishing, setIsPublishing] = useState(false);
+
+  useEffect(() => {
+    if (!showUpdateModal && !showPublishModal) return;
+    const handleProfileSubBack = (e) => {
+      e.preventDefault();
+      if (showUpdateModal) setShowUpdateModal(false);
+      else if (showPublishModal) setShowPublishModal(false);
+    };
+    window.addEventListener('sonara_back_press', handleProfileSubBack);
+    return () => window.removeEventListener('sonara_back_press', handleProfileSubBack);
+  }, [showUpdateModal, showPublishModal]);
 
   const displayToast = (msg) => {
     setToastMessage(msg);

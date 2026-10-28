@@ -5,6 +5,7 @@ import { downloadTrackToDevice, isTrackCachedOffline, getDownloadedSongsList } f
 import { songMatchesArtist } from '../utils/artistMatch';
 import { getSavedArtists } from '../utils/savedArtists';
 import { getSavedAlbums } from '../utils/savedAlbums';
+import { triggerHaptic } from '../utils/audioEffects';
 import CachedImage from './CachedImage';
 
 export default function LibraryView({ 
@@ -20,13 +21,16 @@ export default function LibraryView({
   onCreatePlaylist, 
   onDeletePlaylist, 
   onRemoveSong,
+  onAddSongToPlaylist,
+  onRenamePlaylist,
   onSelectArtist,
   onSelectAlbum,
   activeTab,
   onActiveTabChange,
   selectedPlaylist,
   onSelectPlaylist,
-  isOffline
+  isOffline,
+  onOpenSongMenu
 }) {
   // 🛠️ FIX: activeTab used to be local state seeded once from a one-shot
   // `initialTab` prop. Since this component fully remounts every time the
@@ -49,13 +53,23 @@ export default function LibraryView({
   // poppable step in the sequence, so back closes the playlist first and
   // only then continues unwinding history — same as every other detail view.
   const setSelectedPlaylist = (playlist) => onSelectPlaylist && onSelectPlaylist(playlist);
-  const [newPlaylistName, setNewPlaylistName] = useState('');
-  const [showCreateForm, setShowCreateForm] = useState(false);
-
   const [editingPlaylistId, setEditingPlaylistId] = useState(null);
   const [editingName, setEditingName] = useState('');
   const [activeMenuId, setActiveMenuId] = useState(null); 
   const [activeTrackMenuId, setActiveTrackMenuId] = useState(null);
+
+  // 🎨 Dedicated Create Playlist Modal States
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createModalName, setCreateModalName] = useState('');
+  const [selectedSongIdsForNew, setSelectedSongIdsForNew] = useState(new Set());
+  const [createModalSearch, setCreateModalSearch] = useState('');
+
+  // 🪄 Playlist 3-Dot Bottom Sheet Dialog & Sub-Modals
+  const [actionSheetPlaylist, setActionSheetPlaylist] = useState(null);
+  const [addSongsModalPlaylist, setAddSongsModalPlaylist] = useState(null);
+  const [addSongsSearch, setAddSongsSearch] = useState('');
+  const [renameModalPlaylist, setRenameModalPlaylist] = useState(null);
+  const [renameModalName, setRenameModalName] = useState('');
 
   // 🌟 Search & Sort States for Library & Playlist Details
   const [librarySearch, setLibrarySearch] = useState('');
@@ -66,6 +80,33 @@ export default function LibraryView({
   // 🆕 Detail-view (album-style) state: per-track download status + header "•••" menu
   const [trackDownloadedMap, setTrackDownloadedMap] = useState({});
   const [showPlaylistHeaderMenu, setShowPlaylistHeaderMenu] = useState(false);
+
+  useEffect(() => {
+    const hasOpenSubModal = showCreateModal || addSongsModalPlaylist || renameModalPlaylist || 
+      showPlaylistHeaderMenu || showPlaylistSearch || activeMenuId || activeTrackMenuId;
+    if (!hasOpenSubModal) return;
+
+    const handleSubModalBack = (e) => {
+      e.preventDefault();
+      if (showCreateModal) {
+        setShowCreateModal(false);
+      } else if (addSongsModalPlaylist) {
+        setAddSongsModalPlaylist(null);
+      } else if (renameModalPlaylist) {
+        setRenameModalPlaylist(null);
+      } else if (showPlaylistHeaderMenu) {
+        setShowPlaylistHeaderMenu(false);
+      } else if (showPlaylistSearch) {
+        setShowPlaylistSearch(false);
+      } else if (activeMenuId) {
+        setActiveMenuId(null);
+      } else if (activeTrackMenuId) {
+        setActiveTrackMenuId(null);
+      }
+    };
+    window.addEventListener('sonara_back_press', handleSubModalBack);
+    return () => window.removeEventListener('sonara_back_press', handleSubModalBack);
+  }, [showCreateModal, addSongsModalPlaylist, renameModalPlaylist, showPlaylistHeaderMenu, showPlaylistSearch, activeMenuId, activeTrackMenuId]);
 
   // Local feedback map to show "Downloading..." text inside individual playlist 3-dots menus
   const [playlistDownloadStatus, setPlaylistDownloadStatus] = useState({});
@@ -304,6 +345,564 @@ export default function LibraryView({
   };
 
   // ─────────────────────────────────────────────────────────────
+  // 🎨 PLAYLIST CREATOR & 3-DOT ACTION SHEET LOGIC & MODALS
+  // ─────────────────────────────────────────────────────────────
+  const handleFinalizeCreatePlaylist = () => {
+    if (!createModalName.trim()) return;
+    triggerHaptic(25);
+    const initialTracks = songs.filter(s => selectedSongIdsForNew.has(s.id) || selectedSongIdsForNew.has(s.title || s.name));
+    onCreatePlaylist(createModalName.trim(), initialTracks);
+    setCreateModalName('');
+    setSelectedSongIdsForNew(new Set());
+    setCreateModalSearch('');
+    setShowCreateModal(false);
+  };
+
+  const toggleSongForNewPlaylist = (song) => {
+    triggerHaptic(15);
+    const key = song.id || song.title || song.name;
+    setSelectedSongIdsForNew(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const handleActionPlay = (playlist) => {
+    triggerHaptic(20);
+    const pSongs = getPlaylistSongsWithMapping(playlist.id);
+    if (!pSongs || pSongs.length === 0) {
+      alert("This playlist has no songs yet.");
+      setActionSheetPlaylist(null);
+      return;
+    }
+    onSelectTrack(pSongs[0], pSongs);
+    setActionSheetPlaylist(null);
+  };
+
+  const handleActionShuffle = (playlist) => {
+    triggerHaptic(20);
+    const pSongs = getPlaylistSongsWithMapping(playlist.id);
+    if (!pSongs || pSongs.length === 0) {
+      alert("This playlist has no songs yet.");
+      setActionSheetPlaylist(null);
+      return;
+    }
+    const shuffled = [...pSongs].sort(() => Math.random() - 0.5);
+    onSelectTrack(shuffled[0], shuffled);
+    setActionSheetPlaylist(null);
+  };
+
+  const handleActionAddSongs = (playlist) => {
+    triggerHaptic(20);
+    setActionSheetPlaylist(null);
+    setAddSongsModalPlaylist(playlist);
+    setAddSongsSearch('');
+  };
+
+  const handleActionOpenRename = (playlist) => {
+    triggerHaptic(20);
+    setActionSheetPlaylist(null);
+    setRenameModalPlaylist(playlist);
+    setRenameModalName(playlist.playlistName || '');
+  };
+
+  const handleSaveRename = async () => {
+    if (!renameModalName.trim() || !renameModalPlaylist) return;
+    triggerHaptic(25);
+    const newTitle = renameModalName.trim();
+    if (onRenamePlaylist) {
+      await onRenamePlaylist(renameModalPlaylist.id, newTitle);
+    } else {
+      try {
+        const playlistRef = doc(db, 'playlists', renameModalPlaylist.id);
+        await updateDoc(playlistRef, { playlistName: newTitle });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    if (selectedPlaylist && selectedPlaylist.id === renameModalPlaylist.id) {
+      setSelectedPlaylist(prev => ({ ...prev, playlistName: newTitle }));
+    }
+    setRenameModalPlaylist(null);
+    setRenameModalName('');
+  };
+
+  const handleActionShare = async (playlist) => {
+    triggerHaptic(20);
+    setActionSheetPlaylist(null);
+    const shareData = {
+      title: playlist.playlistName,
+      text: `Listen to "${playlist.playlistName}" on Sonara!`,
+      url: window.location.href
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
+        alert("Playlist details copied to clipboard!");
+      }
+    } catch (err) {
+      console.log("Share dismissed:", err);
+    }
+  };
+
+  const handleActionDelete = (playlist) => {
+    triggerHaptic(30);
+    if (window.confirm(`Are you sure you want to delete playlist "${playlist.playlistName}"? This action cannot be undone.`)) {
+      onDeletePlaylist(playlist.id);
+      if (selectedPlaylist && selectedPlaylist.id === playlist.id) {
+        setSelectedPlaylist(null);
+      }
+    }
+    setActionSheetPlaylist(null);
+  };
+
+  const getActionPlaylistThumb = (playlist) => {
+    if (!playlist) return 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=200&auto=format&fit=crop';
+    const assigned = getPlaylistSongsWithMapping(playlist.id);
+    return assigned.length > 0
+      ? (assigned[0].cover || assigned[0].image || assigned[0].imageUrl)
+      : 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=200&auto=format&fit=crop';
+  };
+
+  const filteredSongsForCreate = songs.filter(song => {
+    if (!createModalSearch.trim()) return true;
+    const q = createModalSearch.toLowerCase();
+    return (song.title || song.name || '').toLowerCase().includes(q) || (song.artist || '').toLowerCase().includes(q);
+  });
+
+  const filteredSongsForExisting = songs.filter(song => {
+    if (!addSongsSearch.trim()) return true;
+    const q = addSongsSearch.toLowerCase();
+    return (song.title || song.name || '').toLowerCase().includes(q) || (song.artist || '').toLowerCase().includes(q);
+  });
+
+  const renderCreatePlaylistModal = () => {
+    if (!showCreateModal) return null;
+    const countSelected = selectedSongIdsForNew.size;
+
+    return (
+      <div className="sonara-modal-backdrop" onClick={() => setShowCreateModal(false)}>
+        <div className="sonara-modal-sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="sheet-drag-handle"></div>
+
+          <div className="sonara-modal-header">
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800', color: '#ffffff' }}>Create Playlist</h3>
+            <button
+              type="button"
+              className="sonara-modal-close-btn"
+              onClick={() => setShowCreateModal(false)}
+            >
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <div className="sonara-modal-body">
+            {/* Visual Cover Preview */}
+            <div className="playlist-creator-art-preview">
+              <div className="playlist-art-gradient">
+                <i className="fa-solid fa-music"></i>
+              </div>
+              <div className="playlist-art-meta">
+                <h4>{createModalName.trim() || 'My Playlist'}</h4>
+                <p>{countSelected} track{countSelected !== 1 ? 's' : ''} selected</p>
+              </div>
+            </div>
+
+            {/* Playlist Title Field */}
+            <div className="creator-input-container">
+              <i className="fa-solid fa-pen-nib creator-input-icon"></i>
+              <input
+                type="text"
+                placeholder="Give your playlist a title..."
+                value={createModalName}
+                onChange={(e) => setCreateModalName(e.target.value)}
+                autoFocus
+                className="creator-text-input"
+              />
+              {createModalName && (
+                <button type="button" onClick={() => setCreateModalName('')} className="creator-clear-btn">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              )}
+            </div>
+
+            {/* Interactive Song Picker Section */}
+            <div className="creator-songs-section">
+              <div className="creator-songs-header">
+                <span>Add Songs to Playlist ({countSelected})</span>
+                {countSelected > 0 && (
+                  <button type="button" onClick={() => setSelectedSongIdsForNew(new Set())} className="creator-clear-selection-btn">
+                    Clear all
+                  </button>
+                )}
+              </div>
+
+              <div className="creator-songs-search">
+                <i className="fa-solid fa-magnifying-glass"></i>
+                <input
+                  type="text"
+                  placeholder="Search songs to add..."
+                  value={createModalSearch}
+                  onChange={(e) => setCreateModalSearch(e.target.value)}
+                />
+                {createModalSearch && (
+                  <i className="fa-solid fa-xmark" onClick={() => setCreateModalSearch('')}></i>
+                )}
+              </div>
+
+              <div className="creator-songs-list">
+                {filteredSongsForCreate.length > 0 ? (
+                  filteredSongsForCreate.map((song) => {
+                    const songKey = song.id || song.title || song.name;
+                    const isSelected = selectedSongIdsForNew.has(songKey);
+                    return (
+                      <div
+                        key={song.id || song.title}
+                        className={`creator-song-row ${isSelected ? 'selected' : ''}`}
+                        onClick={() => toggleSongForNewPlaylist(song)}
+                      >
+                        <CachedImage
+                          src={song.cover || song.image || song.imageUrl}
+                          alt=""
+                          className="creator-song-thumb"
+                        />
+                        <div className="creator-song-info">
+                          <div className="creator-song-title">{song.title || song.name}</div>
+                          <div className="creator-song-artist">{song.artist || 'Unknown Artist'}</div>
+                        </div>
+                        <div className={`creator-checkbox ${isSelected ? 'checked' : ''}`}>
+                          {isSelected && <i className="fa-solid fa-check"></i>}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', margin: '20px 0' }}>
+                    No songs found matching "{createModalSearch}"
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="sonara-modal-footer">
+            <button
+              type="button"
+              className="sonara-modal-cancel-btn"
+              onClick={() => setShowCreateModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="sonara-modal-primary-btn"
+              disabled={!createModalName.trim()}
+              onClick={handleFinalizeCreatePlaylist}
+            >
+              <i className="fa-solid fa-folder-plus"></i>
+              <span>{countSelected > 0 ? `Create with ${countSelected} tracks` : 'Create Playlist'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderActionSheet = () => {
+    if (!actionSheetPlaylist) return null;
+    const targetTracks = getPlaylistSongsWithMapping(actionSheetPlaylist.id);
+    const isDownloading = playlistDownloadStatus[actionSheetPlaylist.id] === 'loading';
+
+    return (
+      <div className="sonara-modal-backdrop" onClick={() => setActionSheetPlaylist(null)}>
+        <div className="sonara-action-sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="sheet-drag-handle"></div>
+
+          <div className="action-sheet-header">
+            <CachedImage
+              src={getActionPlaylistThumb(actionSheetPlaylist)}
+              alt=""
+              className="action-sheet-thumb"
+            />
+            <div className="action-sheet-meta">
+              <h3>{actionSheetPlaylist.playlistName}</h3>
+              <p>Playlist • {targetTracks.length} tracks • By you</p>
+            </div>
+            <button className="action-sheet-close-btn" onClick={() => setActionSheetPlaylist(null)}>
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <div className="action-sheet-options">
+            <button className="action-sheet-row" onClick={() => handleActionPlay(actionSheetPlaylist)}>
+              <div className="action-icon-circle accent">
+                <i className="fa-solid fa-play"></i>
+              </div>
+              <div className="action-text">
+                <div className="action-title">Play Playlist</div>
+                <div className="action-sub">Start playing from the top</div>
+              </div>
+            </button>
+
+            <button className="action-sheet-row" onClick={() => handleActionShuffle(actionSheetPlaylist)}>
+              <div className="action-icon-circle purple">
+                <i className="fa-solid fa-shuffle"></i>
+              </div>
+              <div className="action-text">
+                <div className="action-title">Shuffle Play</div>
+                <div className="action-sub">Listen in randomized order</div>
+              </div>
+            </button>
+
+            <button className="action-sheet-row" onClick={() => handleActionAddSongs(actionSheetPlaylist)}>
+              <div className="action-icon-circle green">
+                <i className="fa-solid fa-plus"></i>
+              </div>
+              <div className="action-text">
+                <div className="action-title">Add Songs</div>
+                <div className="action-sub">Pick and append tracks from library</div>
+              </div>
+              <i className="fa-solid fa-chevron-right action-chevron"></i>
+            </button>
+
+            <button
+              className="action-sheet-row"
+              disabled={isDownloading}
+              onClick={() => {
+                const target = actionSheetPlaylist;
+                setActionSheetPlaylist(null);
+                handleDownloadPlaylist(target);
+              }}
+            >
+              <div className="action-icon-circle blue">
+                <i className={isDownloading ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-circle-down"}></i>
+              </div>
+              <div className="action-text">
+                <div className="action-title">{isDownloading ? 'Downloading Playlist...' : 'Download Playlist'}</div>
+                <div className="action-sub">Save all tracks for offline listening</div>
+              </div>
+            </button>
+
+            <button className="action-sheet-row" onClick={() => handleActionOpenRename(actionSheetPlaylist)}>
+              <div className="action-icon-circle orange">
+                <i className="fa-solid fa-pen-to-square"></i>
+              </div>
+              <div className="action-text">
+                <div className="action-title">Rename Playlist</div>
+                <div className="action-sub">Change playlist name</div>
+              </div>
+            </button>
+
+            <button className="action-sheet-row" onClick={() => handleActionShare(actionSheetPlaylist)}>
+              <div className="action-icon-circle teal">
+                <i className="fa-solid fa-arrow-up-from-bracket"></i>
+              </div>
+              <div className="action-text">
+                <div className="action-title">Share Playlist</div>
+                <div className="action-sub">Share details or copy link</div>
+              </div>
+            </button>
+
+            <button className="action-sheet-row danger" onClick={() => handleActionDelete(actionSheetPlaylist)}>
+              <div className="action-icon-circle red">
+                <i className="fa-solid fa-trash-can"></i>
+              </div>
+              <div className="action-text">
+                <div className="action-title" style={{ color: '#ff4d4d' }}>Delete Playlist</div>
+                <div className="action-sub">Permanently delete playlist and its songs</div>
+              </div>
+            </button>
+          </div>
+
+          <div className="action-sheet-footer">
+            <button className="action-sheet-dismiss-btn" onClick={() => setActionSheetPlaylist(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAddSongsModal = () => {
+    if (!addSongsModalPlaylist) return null;
+    const currentAssignedMappings = playlistSongs.filter(m => m.playlistId === addSongsModalPlaylist.id);
+    const existingSongKeys = new Set(currentAssignedMappings.map(m => (m.songId || '').toLowerCase()));
+
+    return (
+      <div className="sonara-modal-backdrop" onClick={() => setAddSongsModalPlaylist(null)}>
+        <div className="sonara-modal-sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="sheet-drag-handle"></div>
+
+          <div className="sonara-modal-header">
+            <div style={{ minWidth: 0, flex: 1, paddingRight: '10px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800', color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Add to "{addSongsModalPlaylist.playlistName}"
+              </h3>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Tap a song to add it to your playlist
+              </p>
+            </div>
+            <button
+              type="button"
+              className="sonara-modal-close-btn"
+              onClick={() => setAddSongsModalPlaylist(null)}
+            >
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <div className="sonara-modal-body" style={{ maxHeight: '60vh' }}>
+            <div className="creator-songs-search">
+              <i className="fa-solid fa-magnifying-glass"></i>
+              <input
+                type="text"
+                placeholder="Search songs to add..."
+                value={addSongsSearch}
+                onChange={(e) => setAddSongsSearch(e.target.value)}
+                autoFocus
+              />
+              {addSongsSearch && (
+                <i className="fa-solid fa-xmark" onClick={() => setAddSongsSearch('')}></i>
+              )}
+            </div>
+
+            <div className="creator-songs-list" style={{ maxHeight: '42vh' }}>
+              {filteredSongsForExisting.length > 0 ? (
+                filteredSongsForExisting.map((song) => {
+                  const songTitleKey = (song.title || song.name || '').toLowerCase();
+                  const songIdKey = (song.id || '').toLowerCase();
+                  const isAlreadyIn = existingSongKeys.has(songTitleKey) || existingSongKeys.has(songIdKey);
+
+                  return (
+                    <div
+                      key={song.id || song.title}
+                      className="creator-song-row"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => {
+                        triggerHaptic(15);
+                        if (!isAlreadyIn && onAddSongToPlaylist) {
+                          onAddSongToPlaylist(addSongsModalPlaylist.id, song);
+                        }
+                      }}
+                    >
+                      <CachedImage
+                        src={song.cover || song.image || song.imageUrl}
+                        alt=""
+                        className="creator-song-thumb"
+                      />
+                      <div className="creator-song-info">
+                        <div className="creator-song-title">{song.title || song.name}</div>
+                        <div className="creator-song-artist">{song.artist || 'Unknown Artist'}</div>
+                      </div>
+
+                      {isAlreadyIn ? (
+                        <span className="already-added-pill">
+                          <i className="fa-solid fa-check"></i> Added
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="add-to-playlist-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            triggerHaptic(20);
+                            if (onAddSongToPlaylist) {
+                              onAddSongToPlaylist(addSongsModalPlaylist.id, song);
+                            }
+                          }}
+                        >
+                          <i className="fa-solid fa-plus"></i> Add
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', margin: '20px 0' }}>
+                  No songs match "{addSongsSearch}"
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="sonara-modal-footer">
+            <button
+              type="button"
+              className="sonara-modal-primary-btn"
+              style={{ flex: 1 }}
+              onClick={() => setAddSongsModalPlaylist(null)}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderRenameModal = () => {
+    if (!renameModalPlaylist) return null;
+
+    return (
+      <div className="sonara-modal-backdrop" style={{ alignItems: 'center' }} onClick={() => setRenameModalPlaylist(null)}>
+        <div className="rename-modal-container" onClick={(e) => e.stopPropagation()}>
+          <div style={{ padding: '20px' }}>
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '1.15rem', fontWeight: '800', color: '#ffffff' }}>
+              Rename Playlist
+            </h3>
+            <input
+              type="text"
+              value={renameModalName}
+              onChange={(e) => setRenameModalName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRename(); }}
+              autoFocus
+              className="creator-text-input"
+              style={{ height: '44px', marginBottom: '18px' }}
+              placeholder="Playlist name..."
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                className="sonara-modal-cancel-btn"
+                style={{ height: '42px' }}
+                onClick={() => setRenameModalPlaylist(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="sonara-modal-primary-btn"
+                style={{ height: '42px' }}
+                disabled={!renameModalName.trim()}
+                onClick={handleSaveRename}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderModals = () => (
+    <>
+      {renderCreatePlaylistModal()}
+      {renderActionSheet()}
+      {renderAddSongsModal()}
+      {renderRenameModal()}
+    </>
+  );
+
+  // ─────────────────────────────────────────────────────────────
   // SUBVIEW: EXPANDED PLAYLIST TRACK LIST (ONLINE)
   // ─────────────────────────────────────────────────────────────
   if (selectedPlaylist && !isOffline) {
@@ -421,7 +1020,7 @@ export default function LibraryView({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', position: 'relative' }}>
-            <div style={{ display: 'flex', gap: '22px', alignItems: 'center', color: '#ffffff', fontSize: '1.35rem' }}>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', color: '#ffffff', fontSize: '1.25rem' }}>
               <button onClick={() => handleDownloadPlaylist(selectedPlaylist)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Download entire playlist">
                 <i className={isDownloadingThisPlaylist ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"}></i>
               </button>
@@ -430,17 +1029,41 @@ export default function LibraryView({
                 <i className="fa-solid fa-arrow-up-from-bracket"></i>
               </button>
 
-              <div style={{ position: 'relative', display: 'inline-block' }}>
-                <button onClick={() => setShowPlaylistHeaderMenu(!showPlaylistHeaderMenu)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>
-                  <i className="fa-solid fa-ellipsis-vertical"></i>
-                </button>
-                {showPlaylistHeaderMenu && (
-                  <div className="premium-dropdown-menu" style={{ left: '0', top: '30px', position: 'absolute', zIndex: 600 }}>
-                    <button onClick={() => { setEditingName(selectedPlaylist.playlistName); setEditingPlaylistId(selectedPlaylist.id); setShowPlaylistHeaderMenu(false); }} className="dropdown-playlist-option" style={{ padding: '12px 14px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', color: '#ffffff', cursor: 'pointer', fontSize: '0.9rem' }}>Rename Playlist</button>
-                    <button onClick={() => { if (window.confirm(`Delete playlist "${selectedPlaylist.playlistName}" completely?`)) { onDeletePlaylist(selectedPlaylist.id); handleCloseDetail(); } else { setShowPlaylistHeaderMenu(false); } }} className="dropdown-playlist-option" style={{ padding: '12px 14px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', color: '#ff4d4d', cursor: 'pointer', fontSize: '0.9rem' }}>Delete Playlist</button>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => {
+                  triggerHaptic(20);
+                  setAddSongsModalPlaylist(selectedPlaylist);
+                  setAddSongsSearch('');
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '20px',
+                  padding: '6px 14px',
+                  color: '#ffffff',
+                  fontSize: '0.82rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                title="Add songs to this playlist"
+              >
+                <i className="fa-solid fa-plus" style={{ color: 'var(--accent)' }}></i>
+                <span>Add Songs</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  triggerHaptic(15);
+                  setActionSheetPlaylist(selectedPlaylist);
+                }}
+                style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+                title="Playlist options"
+              >
+                <i className="fa-solid fa-ellipsis-vertical"></i>
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
@@ -582,33 +1205,46 @@ export default function LibraryView({
                   </div>
 
                   <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                    <button className="track-options-btn" onClick={() => setActiveTrackMenuId(activeTrackMenuId === song.id ? null : song.id)}><i className="fa-solid fa-ellipsis-vertical"></i></button>
-                    {activeTrackMenuId === song.id && (
-                      <div className="premium-dropdown-menu" style={{ right: '10px', top: '30px', position: 'absolute', zIndex: 500 }}>
-                        <button onClick={(e) => handleDownloadPlaylistTrack(e, song)} className="dropdown-playlist-option" style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: dlState === true ? 'var(--accent)' : '#ffffff' }}>
-                          <i className={dlState === 'loading' ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-arrow-down-to-line"} style={{ color: dlState === true ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}></i>
-                          <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Track'}</span>
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onRemoveSong(selectedPlaylist.id, song); setActiveTrackMenuId(null); }}
-                          className="dropdown-playlist-option"
-                          style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: '#ff4d4d' }}
-                        >
-                          <i className="fa-solid fa-trash" style={{ color: '#ff4d4d' }}></i>
-                          <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Remove from Playlist</span>
-                        </button>
-                      </div>
-                    )}
+                    <button
+                      className="track-options-btn"
+                      onClick={() => onOpenSongMenu ? onOpenSongMenu(song, selectedPlaylist?.id) : setActiveTrackMenuId(activeTrackMenuId === song.id ? null : song.id)}
+                      title="Track options"
+                    >
+                      <i className="fa-solid fa-ellipsis-vertical"></i>
+                    </button>
                   </div>
                 </div>
               );
             }) : (
-              <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px', fontSize: '0.9rem' }}>
-                {playlistSearch ? `No songs match "${playlistSearch}".` : 'This playlist has no songs yet.'}
-              </p>
+              <div style={{ textAlign: 'center', padding: '48px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+                  <i className="fa-solid fa-music" style={{ fontSize: '1.8rem', color: 'rgba(255, 255, 255, 0.3)' }}></i>
+                </div>
+                <h3 style={{ color: '#ffffff', margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: '700' }}>
+                  {playlistSearch ? `No songs match "${playlistSearch}".` : 'Your playlist is empty'}
+                </h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.84rem', margin: '0 0 20px 0', maxWidth: '260px' }}>
+                  {playlistSearch ? 'Try a different search query.' : 'Add your favorite tracks to start listening.'}
+                </p>
+                {!playlistSearch && (
+                  <button
+                    onClick={() => {
+                      triggerHaptic(20);
+                      setAddSongsModalPlaylist(selectedPlaylist);
+                      setAddSongsSearch('');
+                    }}
+                    className="sonara-modal-primary-btn"
+                    style={{ padding: '0 24px', height: '42px', flex: 'none' }}
+                  >
+                    <i className="fa-solid fa-plus"></i>
+                    <span>Add Songs</span>
+                  </button>
+                )}
+              </div>
             );
           })()}
         </div>
+        {renderModals()}
       </div>
     );
   }
@@ -742,27 +1378,31 @@ export default function LibraryView({
         <h2 className="view-title">{isOffline ? 'Downloaded Only' : 'Your Library'}</h2>
         {!isOffline && (
           <button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            style={{ backgroundColor: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '50%', width: '36px', height: '36px', color: '#ffffff', fontSize: '1.25rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => {
+              triggerHaptic(20);
+              setShowCreateModal(true);
+            }}
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '50%',
+              width: '38px',
+              height: '38px',
+              color: '#ffffff',
+              fontSize: '1.05rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+              transition: 'transform 0.15s ease'
+            }}
             title="Create Playlist"
           >
-            +
+            <i className="fa-solid fa-plus"></i>
           </button>
         )}
       </div>
-
-      {showCreateForm && (
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          if(!newPlaylistName.trim()) return;
-          onCreatePlaylist(newPlaylistName);
-          setNewPlaylistName('');
-          setShowCreateForm(false);
-        }} style={{ display: 'flex', gap: '10px', marginBottom: '20px', background: 'rgba(255,255,255,0.04)', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <input type="text" placeholder="New playlist name..." value={newPlaylistName} onChange={(e) => setNewPlaylistName(e.target.value)} style={{ flex: 1, height: '40px', backgroundColor: '#1a2232', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '0 14px', color: '#ffffff', outline: 'none', fontSize: '0.9rem' }} />
-          <button type="submit" style={{ backgroundColor: 'var(--accent)', color: '#000000', border: 'none', borderRadius: '10px', padding: '0 18px', fontWeight: '700', cursor: 'pointer', fontSize: '0.88rem' }}>Create</button>
-        </form>
-      )}
 
       {isOffline ? (
         <div className="library-tabs-container" style={{ display: 'flex', marginBottom: '20px' }}>
@@ -899,47 +1539,17 @@ export default function LibraryView({
                   </div>
 
                   <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                    <button className="track-options-btn" onClick={() => setActiveMenuId(activeMenuId === playlist.id ? null : playlist.id)} style={{ padding: '10px' }}>
+                    <button
+                      className="track-options-btn"
+                      onClick={() => {
+                        triggerHaptic(15);
+                        setActionSheetPlaylist(playlist);
+                      }}
+                      style={{ padding: '10px' }}
+                      title="Playlist options"
+                    >
                       <i className="fa-solid fa-ellipsis-vertical"></i>
                     </button>
-
-                    {activeMenuId === playlist.id && (
-                      <div className="premium-dropdown-menu" style={{ position: 'absolute', bottom: 'auto', top: '35px', right: 0, width: '180px', zIndex: 10 }}>
-                        <button
-                          onClick={() => {
-                            setActiveMenuId(null);
-                            handleDownloadPlaylist(playlist);
-                          }}
-                          disabled={isDownloadingPlaylist}
-                          style={{ padding: '10px', background: 'none', border: 'none', color: 'var(--accent)', width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}
-                        >
-                          <i className={isDownloadingPlaylist ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-circle-down"} style={{ fontSize: '0.85rem' }}></i> 
-                          {isDownloadingPlaylist ? 'Downloading...' : 'Download Playlist'}
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setEditingName(playlist.playlistName);
-                            setEditingPlaylistId(playlist.id);
-                            setActiveMenuId(null);
-                          }}
-                          style={{ padding: '10px', background: 'none', border: 'none', color: '#fff', width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}
-                        >
-                          <i className="fa-solid fa-pen" style={{ fontSize: '0.8rem' }}></i> Rename
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Delete playlist "${playlist.playlistName}" completely?`)) {
-                              onDeletePlaylist(playlist.id);
-                            }
-                            setActiveMenuId(null);
-                          }}
-                          style={{ padding: '10px', background: 'none', border: 'none', color: '#ff4d4d', width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}
-                        >
-                          <i className="fa-solid fa-trash" style={{ fontSize: '0.8rem' }}></i> Delete
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
@@ -1029,6 +1639,8 @@ export default function LibraryView({
           </div>
         )}
       </div>
+
+      {renderModals()}
     </div>
   );
 }

@@ -2,12 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { downloadTrackToDevice, isTrackCachedOffline } from '../utils/offlineStorage';
 import CachedImage from './CachedImage';
 
-export default function GenreDetailsView({ genreName, songs, currentTrack, isPlaying, likedSongIds = [], onToggleLike, onSelectTrack, onBack }) {
+export default function GenreDetailsView({ genreName, songs, currentTrack, isPlaying, likedSongIds = [], onToggleLike, onSelectTrack, onBack, onOpenSongMenu }) {
   const [downloadedMap, setDownloadedMap] = useState({});
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+
+  useEffect(() => {
+    if (!showSearch) return;
+    const handleGenreSubBack = (e) => {
+      e.preventDefault();
+      setShowSearch(false);
+    };
+    window.addEventListener('sonara_back_press', handleGenreSubBack);
+    return () => window.removeEventListener('sonara_back_press', handleGenreSubBack);
+  }, [showSearch]);
 
   const displayToast = (msg) => {
     setToastMessage(msg);
@@ -195,12 +205,13 @@ export default function GenreDetailsView({ genreName, songs, currentTrack, isPla
                   )}
 
                   <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                    <button className="track-options-btn" onClick={() => setActiveMenuId(activeMenuId === song.id ? null : song.id)}><i className="fa-solid fa-ellipsis-vertical"></i></button>
-                    {activeMenuId === song.id && (
-                      <div className="premium-dropdown-menu" style={{ right: '10px', top: '30px', position: 'absolute', zIndex: 500 }}>
-                        <button onClick={(e) => handleDownloadTrack(e, song)} className="dropdown-playlist-option" style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: dlState === true ? 'var(--accent)' : '#ffffff' }}><i className={dlState === 'loading' ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"} style={{ color: dlState === true ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}></i><span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Track'}</span></button>
-                      </div>
-                    )}
+                    <button
+                      className="track-options-btn"
+                      onClick={() => onOpenSongMenu ? onOpenSongMenu(song) : setActiveMenuId(activeMenuId === song.id ? null : song.id)}
+                      title="Track options"
+                    >
+                      <i className="fa-solid fa-ellipsis-vertical"></i>
+                    </button>
                   </div>
                 </div>
               </div>

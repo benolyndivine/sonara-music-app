@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { downloadTrackToDevice, isTrackCachedOffline } from '../utils/offlineStorage';
 import CachedImage from './CachedImage';
 
-export default function SearchView({ songs, playlists, albums, artists, currentTrack, isPlaying, likedSongIds = [], onToggleLike, onSelectTrack, onSelectAlbum, onSelectArtist, onAddSongToPlaylist, autoFocus = true }) {
+export default function SearchView({ songs, playlists, albums, artists, currentTrack, isPlaying, likedSongIds = [], onToggleLike, onSelectTrack, onSelectAlbum, onSelectArtist, onAddSongToPlaylist, onOpenSongMenu, autoFocus = true }) {
   // autoFocus now defaults to true so the search input grabs focus as soon as this
   // view mounts — i.e. the moment the user switches to the Search tab, assuming your
   // tab navigation conditionally renders <SearchView /> (mounts/unmounts per tab).
@@ -406,45 +406,14 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
                       )}
 
                       <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                        <button className="track-options-btn" onClick={() => setActiveDropdown(activeDropdown === song.id ? null : song.id)} style={{ padding: '8px', color: 'rgba(255,255,255,0.6)' }}>
+                        <button
+                          className="track-options-btn"
+                          onClick={() => onOpenSongMenu ? onOpenSongMenu(song) : setActiveDropdown(activeDropdown === song.id ? null : song.id)}
+                          style={{ padding: '8px', color: 'rgba(255,255,255,0.6)' }}
+                          title="Song options"
+                        >
                           <i className="fa-solid fa-ellipsis-vertical"></i>
                         </button>
-
-                        {activeDropdown === song.id && (
-                          <div className="premium-dropdown-menu" style={{ right: '10px', top: '35px', position: 'absolute', zIndex: 500 }}>
-                            <button 
-                              onClick={(e) => handleDownloadClick(e, song)} 
-                              className="dropdown-playlist-option" 
-                              style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: dlState === true ? 'var(--accent)' : '#ffffff' }}
-                            >
-                              <i className={dlState === 'loading' ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"} style={{ color: dlState === true ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}></i>
-                              <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{dlState === true ? 'Saved Offline' : dlState === 'loading' ? 'Downloading...' : 'Download Song'}</span>
-                            </button>
-
-                            <button 
-                              onClick={(e) => handleShareSong(e, song)} 
-                              className="dropdown-playlist-option" 
-                              style={{ padding: '12px 14px', gap: '12px', display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: '#ffffff' }}
-                            >
-                              <i className="fa-solid fa-share-nodes" style={{ color: 'rgba(255,255,255,0.6)' }}></i>
-                              <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Share Song</span>
-                            </button>
-                            
-                            <hr style={{ border: 'none', height: '1px', backgroundColor: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
-                            <p className="dropdown-menu-header" style={{ padding: '6px 14px 4px 14px' }}>Add to Playlist</p>
-                            
-                            {playlists.map(pl => (
-                              <button 
-                                key={pl.id} 
-                                onClick={() => { onAddSongToPlaylist(pl.id, song); setActiveDropdown(null); }} 
-                                className="dropdown-playlist-option"
-                                style={{ padding: '10px 14px', background: 'transparent', border: 'none', width: '100%', textAlign: 'left', color: '#ffffff', cursor: 'pointer', fontSize: '0.9rem' }}
-                              >
-                                <span className="dropdown-playlist-name-text">{pl.playlistName}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>

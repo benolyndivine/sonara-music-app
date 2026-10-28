@@ -1,6 +1,6 @@
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
-import { getDownloadQuality, getStreamingQuality, appendQualityParam } from './audioQuality';
+import { getDownloadQuality, getStreamingQuality, appendQualityParam, applyQualityToUrl, QUALITY_LABELS } from './audioQuality';
 import { primeImageCache } from './imageCache';
 
 // Global listeners for live download progress updates
@@ -60,7 +60,7 @@ export async function downloadTrackToDevice(song) {
   }
 
   const downloadQuality = getDownloadQuality();
-  const audioUrl = appendQualityParam(rawAudioUrl, downloadQuality);
+  const audioUrl = applyQualityToUrl(rawAudioUrl, downloadQuality);
 
   // Initialize progress tracking
   activeDownloads[song.id] = {
@@ -270,6 +270,7 @@ export function getDownloadedSongsList() {
       artist: meta.artist || 'Unknown Artist',
       cover: meta.cover || null,
       albumId: meta.albumId || null,
+      quality: meta.quality || 'High',
       size: meta.size || 0,
       downloadedAt: meta.downloadedAt || null,
       songUrl: localPath,
@@ -321,15 +322,203 @@ export async function deleteDownloadedSong(songId) {
 
 /**
  * Resolves a safe binary player pathway reference asset link
+ * Applies the user's selected streaming quality for remote tracks.
  */
-export function getPlaybackSource(song) {
+export function getPlaybackSource(song, options = {}) {
   if (!song) return null;
   const localPath = localStorage.getItem(`offline_track_${song.id}`);
   if (localPath) return localPath;
 
   const remoteUrl = song.songUrl || song.audioUrl;
   if (!remoteUrl) return null;
-  return remoteUrl;
+  const quality = options.quality || getStreamingQuality();
+  return applyQualityToUrl(remoteUrl, quality);
+}
+
+/**
+ * Smart Storage Optimization:
+ * - Scans and purges broken, empty, or orphaned offline metadata and tracks.
+ * - On native Capacitor platforms: audits Directory.Data to ensure files referenced
+ *   by localStorage exist, and purges any orphaned physical files left over from aborted downloads.
+ * - Cleans up corrupted/stale image cache entries.
+ * - Reconstructs missing track metadata where possible.
+ */
+export async function runSmartStorageOptimization({ songs = [] } = {}) {
+  let cleanedRecords = 0;
+  let freedBytes = 0;
+  let repairedRecords = 0;
+
+  try {
+    const trackKeys = new Set();
+    const metaKeys = new Set();
+    const videoKeys = new Set();
+    const imgCacheKeys = new Set();
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith('offline_track_')) trackKeys.add(k);
+      else if (k.startsWith('offline_meta_')) metaKeys.add(k);
+      else if (k.startsWith('offline_video_')) videoKeys.add(k);
+      else if (k.startsWith('cached_img_')) imgCacheKeys.add(k);
+    }
+
+    // 1. Audit offline_track_* entries
+    for (const trackKey of trackKeys) {
+      const songId = trackKey.replace('offline_track_', '');
+      const trackVal = localStorage.getItem(trackKey);
+
+      // Broken or empty entry
+      if (!trackVal || trackVal.trim() === '' || trackVal === 'null' || trackVal === 'undefined') {
+        localStorage.removeItem(trackKey);
+        localStorage.removeItem(`offline_meta_${songId}`);
+        localStorage.removeItem(`offline_video_${songId}`);
+        cleanedRecords++;
+        continue;
+      }
+
+      // Native filesystem existence & integrity check
+      if (Capacitor.isNativePlatform() && trackVal.includes('sonara_track_')) {
+        try {
+          const filename = `sonara_track_${songId}.mp3`;
+          const stat = await Filesystem.stat({
+            path: filename,
+            directory: Directory.Data,
+          });
+          if (!stat || stat.size === 0) {
+            await Filesystem.deleteFile({ path: filename, directory: Directory.Data }).catch(() => {});
+            localStorage.removeItem(trackKey);
+            localStorage.removeItem(`offline_meta_${songId}`);
+            localStorage.removeItem(`offline_video_${songId}`);
+            cleanedRecords++;
+            continue;
+          }
+        } catch (statErr) {
+          // File does not physically exist on disk
+          localStorage.removeItem(trackKey);
+          localStorage.removeItem(`offline_meta_${songId}`);
+          localStorage.removeItem(`offline_video_${songId}`);
+          cleanedRecords++;
+          continue;
+        }
+      }
+
+      // Ensure metadata exists for this track; if missing, repair it
+      const metaKey = `offline_meta_${songId}`;
+      const rawMeta = localStorage.getItem(metaKey);
+      if (!rawMeta) {
+        const songMatch = songs.find(s => s.id === songId);
+        const repaired = {
+          id: songId,
+          title: songMatch?.title || songMatch?.name || 'Offline Track',
+          artist: songMatch?.artist || 'Unknown Artist',
+          cover: songMatch?.cover || songMatch?.image || songMatch?.imageUrl || null,
+          albumId: songMatch?.albumId || null,
+          quality: getDownloadQuality(),
+          size: 4500000,
+          downloadedAt: new Date().toISOString()
+        };
+        localStorage.setItem(metaKey, JSON.stringify(repaired));
+        repairedRecords++;
+      }
+    }
+
+    // 2. Audit orphaned offline_meta_* (meta exists without matching track)
+    for (const metaKey of metaKeys) {
+      const songId = metaKey.replace('offline_meta_', '');
+      if (!localStorage.getItem(`offline_track_${songId}`)) {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(metaKey) || '{}');
+          freedBytes += (parsed.size || 0);
+        } catch (_) {}
+        localStorage.removeItem(metaKey);
+        cleanedRecords++;
+      }
+    }
+
+    // 3. Audit orphaned offline_video_*
+    for (const videoKey of videoKeys) {
+      const songId = videoKey.replace('offline_video_', '');
+      const hasTrack = localStorage.getItem(`offline_track_${songId}`);
+      const hasSong = songs.some(s => s.id === songId);
+      if (!hasTrack && !hasSong) {
+        if (Capacitor.isNativePlatform()) {
+          try {
+            await Filesystem.deleteFile({
+              path: `sonara_canvas_${songId}.mp4`,
+              directory: Directory.Data
+            });
+          } catch (_) {}
+        }
+        localStorage.removeItem(videoKey);
+        cleanedRecords++;
+      }
+    }
+
+    // 4. Native Orphan File Scavenger (files on disk with no localStorage reference)
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const dirResult = await Filesystem.readdir({
+          path: '',
+          directory: Directory.Data,
+        });
+        const files = dirResult.files || [];
+        for (const file of files) {
+          const filename = typeof file === 'string' ? file : file.name;
+          if (!filename) continue;
+
+          if (filename.startsWith('sonara_track_') && filename.endsWith('.mp3')) {
+            const songId = filename.replace('sonara_track_', '').replace('.mp3', '');
+            if (!localStorage.getItem(`offline_track_${songId}`)) {
+              try {
+                const stat = await Filesystem.stat({ path: filename, directory: Directory.Data });
+                freedBytes += (stat.size || 0);
+                await Filesystem.deleteFile({ path: filename, directory: Directory.Data });
+                cleanedRecords++;
+              } catch (_) {}
+            }
+          } else if (filename.startsWith('sonara_canvas_') && filename.endsWith('.mp4')) {
+            const songId = filename.replace('sonara_canvas_', '').replace('.mp4', '');
+            if (!localStorage.getItem(`offline_video_${songId}`)) {
+              try {
+                const stat = await Filesystem.stat({ path: filename, directory: Directory.Data });
+                freedBytes += (stat.size || 0);
+                await Filesystem.deleteFile({ path: filename, directory: Directory.Data });
+                cleanedRecords++;
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (fsErr) {
+        console.warn('Native storage directory scan skipped:', fsErr);
+      }
+    }
+
+    // 5. Clean invalid / empty image cache entries
+    for (const imgKey of imgCacheKeys) {
+      const val = localStorage.getItem(imgKey);
+      if (!val || val.length < 20) {
+        localStorage.removeItem(imgKey);
+        cleanedRecords++;
+      }
+    }
+  } catch (err) {
+    console.error('Smart storage optimization encountered an issue:', err);
+  }
+
+  const formatMb = (b) => (b / (1024 * 1024)).toFixed(1);
+  let details = '';
+  if (cleanedRecords > 0 && freedBytes > 0) {
+    details = `Smart Storage: Purged ${cleanedRecords} orphaned item${cleanedRecords !== 1 ? 's' : ''} (${formatMb(freedBytes)} MB freed)`;
+  } else if (cleanedRecords > 0) {
+    details = `Smart Storage: Cleaned ${cleanedRecords} orphaned storage record${cleanedRecords !== 1 ? 's' : ''}`;
+  } else if (repairedRecords > 0) {
+    details = `Smart Storage: Repaired ${repairedRecords} track metadata record${repairedRecords !== 1 ? 's' : ''}`;
+  } else {
+    details = 'Smart Storage: Cache healthy & fully optimized';
+  }
+
+  return { cleanedRecords, freedBytes, repairedRecords, details };
 }
 
 /**

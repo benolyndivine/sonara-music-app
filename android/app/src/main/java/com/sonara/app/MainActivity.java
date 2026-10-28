@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AudioRouteInfoPlugin.class);
+        registerPlugin(AudioEffectsPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Enable edge-to-edge full screen

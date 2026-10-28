@@ -8,8 +8,13 @@ import {
   subscribeToDownloadProgress, 
   getActiveDownloads 
 } from '../utils/offlineStorage';
+import { getDownloadQuality, QUALITY_LABELS } from '../utils/audioQuality';
 
-export default function DownloadCenterView({ onClose, onSelectTrack, isPlaying, currentTrack, onTogglePlay }) {
+export default function DownloadCenterView({ 
+  onClose, onSelectTrack, isPlaying, currentTrack, onTogglePlay, 
+  downloadQuality: downloadQualityProp, onOpenSettings 
+}) {
+  const currentDlQuality = downloadQualityProp || getDownloadQuality();
   const [downloadedSongs, setDownloadedSongs] = useState([]);
   const [totalStorage, setTotalStorage] = useState(0);
   const [activeTasks, setActiveTasks] = useState(getActiveDownloads());
@@ -409,7 +414,14 @@ export default function DownloadCenterView({ onClose, onSelectTrack, isPlaying, 
         <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: '800', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
           Downloaded Tracks ({filteredDownloads.length})
         </h3>
-        <span className="audio-hq-badge">Lossless 320k</span>
+        <span 
+          className="audio-hq-badge" 
+          onClick={onOpenSettings}
+          style={{ cursor: onOpenSettings ? 'pointer' : 'default' }}
+          title="Current download quality profile (Tap to open Settings)"
+        >
+          {currentDlQuality} • {QUALITY_LABELS[currentDlQuality] || '256k'}
+        </span>
       </div>
 
       {/* Downloads List */}
@@ -456,7 +468,7 @@ export default function DownloadCenterView({ onClose, onSelectTrack, isPlaying, 
                       <span>{song.title}</span>
                     </h4>
                     <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {song.artist} • <span style={{ color: 'var(--accent)', fontWeight: '600' }}>{formatBytes(song.size)}</span>
+                      {song.artist} • <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '600' }}>{QUALITY_LABELS[song.quality] || song.quality || '256 kbps'}</span> • <span style={{ color: 'var(--accent)', fontWeight: '600' }}>{formatBytes(song.size)}</span>
                     </p>
                   </div>
                 </div>
