@@ -509,6 +509,11 @@ public class AudioPlayer implements OnCompletionListener, OnPreparedListener, On
         // Listen for playback completion
         this.player.setOnCompletionListener(this);
 
+        // Ensure maximum full-scale audio output
+        try {
+            this.player.setVolume(1.0f, 1.0f);
+        } catch (Throwable ignored) {}
+
         // Connect Sonara native audio effects engine (Equalizer, 3D Spatial Audio, Dolby Atmos)
         try {
             int audioSessionId = this.player.getAudioSessionId();

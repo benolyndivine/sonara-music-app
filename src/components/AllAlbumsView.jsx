@@ -51,7 +51,7 @@ export default function AllAlbumsView({ albums, onSelectAlbum, onBack }) {
                 }} 
               />
             </div>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: '600', margin: '10px 0 2px 0', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: '600', margin: '10px 0 2px 0', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {album.name}
             </h3>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

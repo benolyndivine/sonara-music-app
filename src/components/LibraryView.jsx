@@ -30,6 +30,7 @@ export default function LibraryView({
   selectedPlaylist,
   onSelectPlaylist,
   isOffline,
+  likedSongIds = [],
   onOpenSongMenu
 }) {
   // 🛠️ FIX: activeTab used to be local state seeded once from a one-shot
@@ -76,6 +77,22 @@ export default function LibraryView({
   const [librarySort, setLibrarySort] = useState('recent'); // 'recent' | 'az' | 'count'
   const [playlistSearch, setPlaylistSearch] = useState('');
   const [showPlaylistSearch, setShowPlaylistSearch] = useState(false);
+
+  // 📌 Pinned Playlists State
+  const [pinnedPlaylistIds, setPinnedPlaylistIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sonara_pinned_playlists') || '[]'); } catch { return []; }
+  });
+
+  const togglePinPlaylist = (playlistId) => {
+    triggerHaptic(20);
+    setPinnedPlaylistIds((prev) => {
+      const isPinned = prev.includes(playlistId);
+      const next = isPinned ? prev.filter(id => id !== playlistId) : [playlistId, ...prev];
+      try { localStorage.setItem('sonara_pinned_playlists', JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+    setActionSheetPlaylist(null);
+  };
 
   // 🆕 Detail-view (album-style) state: per-track download status + header "•••" menu
   const [trackDownloadedMap, setTrackDownloadedMap] = useState({});
@@ -493,7 +510,7 @@ export default function LibraryView({
           <div className="sheet-drag-handle"></div>
 
           <div className="sonara-modal-header">
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800', color: '#ffffff' }}>Create Playlist</h3>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)' }}>Create Playlist</h3>
             <button
               type="button"
               className="sonara-modal-close-btn"
@@ -661,6 +678,20 @@ export default function LibraryView({
               </div>
             </button>
 
+            <button className="action-sheet-row" onClick={() => togglePinPlaylist(actionSheetPlaylist.id)}>
+              <div className="action-icon-circle yellow" style={{ background: 'rgba(234, 179, 8, 0.2)', color: '#facc15' }}>
+                <i className="fa-solid fa-thumbtack"></i>
+              </div>
+              <div className="action-text">
+                <div className="action-title">
+                  {pinnedPlaylistIds.includes(actionSheetPlaylist.id) ? 'Unpin from Top' : 'Pin to Top'}
+                </div>
+                <div className="action-sub">
+                  {pinnedPlaylistIds.includes(actionSheetPlaylist.id) ? 'Remove pinned priority' : 'Keep at the top of your library'}
+                </div>
+              </div>
+            </button>
+
             <button className="action-sheet-row" onClick={() => handleActionAddSongs(actionSheetPlaylist)}>
               <div className="action-icon-circle green">
                 <i className="fa-solid fa-plus"></i>
@@ -743,7 +774,7 @@ export default function LibraryView({
 
           <div className="sonara-modal-header">
             <div style={{ minWidth: 0, flex: 1, paddingRight: '10px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800', color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 Add to "{addSongsModalPlaylist.playlistName}"
               </h3>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -855,7 +886,7 @@ export default function LibraryView({
       <div className="sonara-modal-backdrop" style={{ alignItems: 'center' }} onClick={() => setRenameModalPlaylist(null)}>
         <div className="rename-modal-container" onClick={(e) => e.stopPropagation()}>
           <div style={{ padding: '20px' }}>
-            <h3 style={{ margin: '0 0 14px 0', fontSize: '1.15rem', fontWeight: '800', color: '#ffffff' }}>
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)' }}>
               Rename Playlist
             </h3>
             <input
@@ -985,12 +1016,12 @@ export default function LibraryView({
 
         <div style={{ padding: '0 20px', position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0 10px 0' }}>
-            <button onClick={handleCloseDetail} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}>
+            <button onClick={handleCloseDetail} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}>
               <i className="fa-solid fa-arrow-left"></i>
             </button>
             <button
               onClick={() => setShowPlaylistSearch(!showPlaylistSearch)}
-              style={{ background: 'none', border: 'none', color: showPlaylistSearch ? 'var(--accent)' : 'rgba(255, 255, 255, 0.75)', cursor: 'pointer', fontSize: '1.15rem', padding: 0 }}
+              style={{ background: 'none', border: 'none', color: showPlaylistSearch ? 'var(--accent)' : 'var(--text-muted, rgba(255, 255, 255, 0.75))', cursor: 'pointer', fontSize: '1.15rem', padding: 0 }}
               title="Search songs in playlist"
             >
               <i className="fa-solid fa-magnifying-glass"></i>
@@ -1009,10 +1040,10 @@ export default function LibraryView({
                 onChange={(e) => setEditingName(e.target.value)}
                 onBlur={() => handleInlineRenameSave(selectedPlaylist.id)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleInlineRenameSave(selectedPlaylist.id); }}
-                style={{ width: '100%', boxSizing: 'border-box', margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '700', color: '#ffffff', letterSpacing: '-0.6px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--accent)', borderRadius: '8px', padding: '4px 8px', outline: 'none' }}
+                style={{ width: '100%', boxSizing: 'border-box', margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-main)', letterSpacing: '-0.6px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--accent)', borderRadius: '8px', padding: '4px 8px', outline: 'none' }}
               />
             ) : (
-              <h2 style={{ margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.6px' }}>{selectedPlaylist.playlistName}</h2>
+              <h2 style={{ margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.6px' }}>{selectedPlaylist.playlistName}</h2>
             )}
             <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '500' }}>
               Playlist • {currentPlaylistSongs.length} tracks{formattedPlaylistDuration ? ` • ${formattedPlaylistDuration}` : ''}
@@ -1020,12 +1051,12 @@ export default function LibraryView({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', position: 'relative' }}>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', color: '#ffffff', fontSize: '1.25rem' }}>
-              <button onClick={() => handleDownloadPlaylist(selectedPlaylist)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Download entire playlist">
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', color: 'var(--text-main)', fontSize: '1.25rem' }}>
+              <button onClick={() => handleDownloadPlaylist(selectedPlaylist)} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Download entire playlist">
                 <i className={isDownloadingThisPlaylist ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"}></i>
               </button>
 
-              <button onClick={handleSharePlaylist} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Share playlist">
+              <button onClick={handleSharePlaylist} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Share playlist">
                 <i className="fa-solid fa-arrow-up-from-bracket"></i>
               </button>
 
@@ -1036,11 +1067,11 @@ export default function LibraryView({
                   setAddSongsSearch('');
                 }}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: 'var(--card-bg, rgba(255, 255, 255, 0.08))',
+                  border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.12))',
                   borderRadius: '20px',
                   padding: '6px 14px',
-                  color: '#ffffff',
+                  color: 'var(--text-main)',
                   fontSize: '0.82rem',
                   fontWeight: '600',
                   cursor: 'pointer',
@@ -1059,7 +1090,7 @@ export default function LibraryView({
                   triggerHaptic(15);
                   setActionSheetPlaylist(selectedPlaylist);
                 }}
-                style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
                 title="Playlist options"
               >
                 <i className="fa-solid fa-ellipsis-vertical"></i>
@@ -1108,7 +1139,7 @@ export default function LibraryView({
                 <button
                   type="button"
                   onClick={() => setPlaylistSearch('')}
-                  style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+                  style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
                 >
                   <i className="fa-solid fa-xmark"></i>
                 </button>
@@ -1197,7 +1228,7 @@ export default function LibraryView({
 
                   <div className="list-img-wrapper"><CachedImage src={songImgSrc} alt={songTitle} className="list-track-thumb" /></div>
                   <div className="list-track-details" style={{ marginLeft: '4px' }}>
-                    <h3 style={{ color: isCurrent ? 'var(--accent)' : '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h3 style={{ color: isCurrent ? 'var(--accent)' : 'var(--text-main, #ffffff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {songTitle}
                       {dlState === true && <i className="fa-solid fa-circle-down" style={{ color: 'var(--accent)', fontSize: '0.75rem', marginLeft: '4px' }}></i>}
                     </h3>
@@ -1220,7 +1251,7 @@ export default function LibraryView({
                 <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
                   <i className="fa-solid fa-music" style={{ fontSize: '1.8rem', color: 'rgba(255, 255, 255, 0.3)' }}></i>
                 </div>
-                <h3 style={{ color: '#ffffff', margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: '700' }}>
+                <h3 style={{ color: 'var(--text-main)', margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: '700' }}>
                   {playlistSearch ? `No songs match "${playlistSearch}".` : 'Your playlist is empty'}
                 </h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.84rem', margin: '0 0 20px 0', maxWidth: '260px' }}>
@@ -1277,7 +1308,7 @@ export default function LibraryView({
 
         <div style={{ padding: '0 20px', position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', padding: '14px 0 10px 0' }}>
-            <button onClick={() => setSelectedPlaylist(null)} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}>
+            <button onClick={() => setSelectedPlaylist(null)} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}>
               <i className="fa-solid fa-arrow-left"></i>
             </button>
           </div>
@@ -1287,7 +1318,7 @@ export default function LibraryView({
           </div>
 
           <div style={{ marginBottom: '22px' }}>
-            <h2 style={{ margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.6px' }}>{selectedPlaylist.playlistName}</h2>
+            <h2 style={{ margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.6px' }}>{selectedPlaylist.playlistName}</h2>
             <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '500' }}>Playlist • {cachedPlaylistSongs.length} downloaded track{cachedPlaylistSongs.length !== 1 ? 's' : ''}</p>
           </div>
 
@@ -1319,7 +1350,7 @@ export default function LibraryView({
 
                   <div className="list-img-wrapper"><CachedImage src={song.cover || song.image || song.imageUrl} className="list-track-thumb" alt="" /></div>
                   <div className="list-track-details">
-                    <h3 style={{ color: isCurrent ? 'var(--accent)' : '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h3 style={{ color: isCurrent ? 'var(--accent)' : 'var(--text-main, #ffffff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {song.title || song.name}
                     </h3>
                     <p>{song.artist} • <span style={{ color: 'var(--accent)' }}>Saved Offline</span></p>
@@ -1344,6 +1375,11 @@ export default function LibraryView({
     if (!librarySearch.trim()) return true;
     return (p.playlistName || '').toLowerCase().includes(librarySearch.toLowerCase());
   }).sort((a, b) => {
+    const isPinnedA = pinnedPlaylistIds.includes(a.id);
+    const isPinnedB = pinnedPlaylistIds.includes(b.id);
+    if (isPinnedA && !isPinnedB) return -1;
+    if (!isPinnedA && isPinnedB) return 1;
+
     if (librarySort === 'az') return (a.playlistName || '').localeCompare(b.playlistName || '');
     if (librarySort === 'count') {
       const countA = getPlaylistSongsWithMapping(a.id).length;
@@ -1388,7 +1424,7 @@ export default function LibraryView({
               borderRadius: '50%',
               width: '38px',
               height: '38px',
-              color: '#ffffff',
+              color: 'var(--text-main)',
               fontSize: '1.05rem',
               cursor: 'pointer',
               display: 'flex',
@@ -1412,9 +1448,9 @@ export default function LibraryView({
         </div>
       ) : (
         <div className="library-tabs-container" style={{ display: 'flex', gap: '10px', marginBottom: '18px' }}>
-          <button onClick={() => setActiveTab('playlists')} style={{ background: activeTab === 'playlists' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.06)', color: activeTab === 'playlists' ? '#000000' : '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Playlists ({playlists.length})</button>
-          <button onClick={() => setActiveTab('albums')} style={{ background: activeTab === 'albums' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.06)', color: activeTab === 'albums' ? '#000000' : '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Albums ({savedAlbums.length})</button>
-          <button onClick={() => setActiveTab('artists')} style={{ background: activeTab === 'artists' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.06)', color: activeTab === 'artists' ? '#000000' : '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Artists ({savedArtists.length})</button>
+          <button onClick={() => setActiveTab('playlists')} style={{ background: activeTab === 'playlists' ? 'var(--accent)' : 'var(--card-bg, rgba(255, 255, 255, 0.06))', color: activeTab === 'playlists' ? '#ffffff' : 'var(--text-main)', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Playlists ({playlists.length})</button>
+          <button onClick={() => setActiveTab('albums')} style={{ background: activeTab === 'albums' ? 'var(--accent)' : 'var(--card-bg, rgba(255, 255, 255, 0.06))', color: activeTab === 'albums' ? '#ffffff' : 'var(--text-main)', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Albums ({savedAlbums.length})</button>
+          <button onClick={() => setActiveTab('artists')} style={{ background: activeTab === 'artists' ? 'var(--accent)' : 'var(--card-bg, rgba(255, 255, 255, 0.06))', color: activeTab === 'artists' ? '#ffffff' : 'var(--text-main)', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '600' }}>Artists ({savedArtists.length})</button>
         </div>
       )}
 
@@ -1430,13 +1466,13 @@ export default function LibraryView({
               style={{
                 width: '100%', height: '38px', backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px',
-                padding: '0 32px 0 34px', color: '#ffffff', fontSize: '0.84rem', outline: 'none',
+                padding: '0 32px 0 34px', color: 'var(--text-main)', fontSize: '0.84rem', outline: 'none',
                 boxSizing: 'border-box'
               }}
             />
             <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.8rem' }}></i>
             {librarySearch && (
-              <i className="fa-solid fa-xmark" onClick={() => setLibrarySearch('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: '0.8rem' }}></i>
+              <i className="fa-solid fa-xmark" onClick={() => setLibrarySearch('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem' }}></i>
             )}
           </div>
           <button
@@ -1445,7 +1481,7 @@ export default function LibraryView({
             }}
             style={{
               height: '38px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '12px', padding: '0 12px', color: '#ffffff', fontSize: '0.78rem', fontWeight: '600',
+              borderRadius: '12px', padding: '0 12px', color: 'var(--text-main)', fontSize: '0.78rem', fontWeight: '600',
               display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flexShrink: 0
             }}
             title="Cycle sort order"
@@ -1459,10 +1495,39 @@ export default function LibraryView({
       <div className="library-display-panel">
         {isOffline ? (
           <>
+            {/* 💾 Offline Storage Vault Banner */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '14px 16px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, rgba(29, 185, 84, 0.12) 0%, rgba(15, 23, 42, 0.6) 100%)',
+                border: '1px solid rgba(29, 185, 84, 0.3)',
+                marginBottom: '20px'
+              }}
+            >
+              <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(29, 185, 84, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: '1.2rem', flexShrink: 0 }}>
+                <i className="fa-solid fa-hard-drive"></i>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                  Offline Vault: {offlineDownloadedSongs.length} Tracks
+                </div>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  ~{(offlineDownloadedSongs.length * 3.8).toFixed(1)} MB stored • 100% playable offline
+                </div>
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(29, 185, 84, 0.2)', color: 'var(--accent)', fontSize: '0.64rem', fontWeight: '800' }}>
+                <i className="fa-solid fa-bolt"></i> READY
+              </div>
+            </div>
+
             {/* 📥 Downloaded playlists */}
             {offlineAvailablePlaylists.length > 0 && (
               <div style={{ marginBottom: '28px' }}>
-                <h3 style={{ fontSize: '0.95rem', color: '#ffffff', margin: '0 0 12px 0', fontWeight: '700' }}>Downloaded Playlists</h3>
+                <h3 style={{ fontSize: '0.95rem', color: 'var(--text-main)', margin: '0 0 12px 0', fontWeight: '700' }}>Downloaded Playlists</h3>
                 <div className="playlists-vertical-grid" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {offlineAvailablePlaylists.map((playlist) => {
                     const cachedTracks = getPlaylistSongsWithMapping(playlist.id).filter((s) => isTrackCachedOffline(s.id));
@@ -1484,7 +1549,7 @@ export default function LibraryView({
             )}
 
             {/* 📥 Downloaded songs */}
-            <h3 style={{ fontSize: '0.95rem', color: '#ffffff', margin: '0 0 12px 0', fontWeight: '700' }}>Downloaded Songs</h3>
+            <h3 style={{ fontSize: '0.95rem', color: 'var(--text-main)', margin: '0 0 12px 0', fontWeight: '700' }}>Downloaded Songs</h3>
             <div className="songs-vertical-grid">
               {offlineDownloadedSongs.length > 0 ? (
                 offlineDownloadedSongs.map((song) => {
@@ -1495,7 +1560,7 @@ export default function LibraryView({
                         <CachedImage src={song.cover || song.image || song.imageUrl} className="list-track-thumb" alt="" />
                       </div>
                       <div className="list-track-details">
-                        <h3 style={{ color: isCurrent ? 'var(--accent)' : '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <h3 style={{ color: isCurrent ? 'var(--accent)' : 'var(--text-main, #ffffff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {isCurrent && (
                             <div className={`playing-equalizer-container ${!isPlaying ? 'animation-paused' : ''}`}>
                               <span className="playing-equalizer-bar"></span>
@@ -1518,6 +1583,81 @@ export default function LibraryView({
           </>
         ) : activeTab === 'playlists' ? (
           <div className="playlists-vertical-grid" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* 💖 Liked Songs Fast Hub */}
+            {likedSongIds && likedSongIds.length > 0 && !librarySearch.trim() && (
+              <div
+                onClick={() => {
+                  triggerHaptic(20);
+                  const likedList = (songs || []).filter(s => likedSongIds.includes(s.id));
+                  if (likedList.length > 0) {
+                    onSelectTrack(likedList[0], likedList);
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  background: 'linear-gradient(135deg, rgba(88, 28, 135, 0.45) 0%, rgba(15, 23, 42, 0.6) 100%)',
+                  border: '1px solid rgba(168, 85, 247, 0.3)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: '0 6px 18px rgba(0, 0, 0, 0.3)',
+                  marginBottom: '4px'
+                }}
+              >
+                <div
+                  style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #4f46e5 0%, #ec4899 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    boxShadow: '0 4px 12px rgba(236, 72, 153, 0.35)'
+                  }}
+                >
+                  <i className="fa-solid fa-heart" style={{ color: '#ffffff', fontSize: '1.4rem' }}></i>
+                </div>
+                <div style={{ flex: 1, marginLeft: '14px' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>Liked Songs</h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '3px 0 0 0' }}>
+                    Auto-playlist • {likedSongIds.length} track{likedSongIds.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerHaptic(20);
+                    const likedList = (songs || []).filter(s => likedSongIds.includes(s.id));
+                    if (likedList.length > 0) {
+                      onSelectTrack(likedList[0], likedList);
+                    }
+                  }}
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    background: 'var(--accent)',
+                    border: 'none',
+                    color: '#000',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(29, 185, 84, 0.4)',
+                    flexShrink: 0
+                  }}
+                >
+                  <i className="fa-solid fa-play" style={{ marginLeft: '2px' }}></i>
+                </button>
+              </div>
+            )}
+
             {filteredPlaylists.map((playlist) => {
               const assignedSongs = getPlaylistSongsWithMapping(playlist.id);
               const playlistImg = assignedSongs.length > 0 
@@ -1525,14 +1665,22 @@ export default function LibraryView({
                 : 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=200&auto=format&fit=crop';
               
               const isDownloadingPlaylist = playlistDownloadStatus[playlist.id] === 'loading';
+              const isPinned = pinnedPlaylistIds.includes(playlist.id);
 
               return (
-                <div key={playlist.id} className="song-list-item" onClick={() => setSelectedPlaylist(playlist)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'visible', borderRadius: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div key={playlist.id} className="song-list-item" onClick={() => setSelectedPlaylist(playlist)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'visible', borderRadius: '14px', background: isPinned ? 'rgba(234, 179, 8, 0.08)' : 'var(--card-bg, rgba(255,255,255,0.02))', border: isPinned ? '1px solid rgba(234, 179, 8, 0.25)' : '1px solid var(--border-subtle, rgba(255,255,255,0.05))' }}>
                   <div className="list-img-wrapper" style={{ width: '60px', height: '60px' }}>
                     <CachedImage src={playlistImg} alt="" className="list-track-thumb" style={{ borderRadius: '10px', boxShadow: '0 4px 14px rgba(0,0,0,0.4)' }} />
                   </div>
                   <div className="list-track-details" style={{ marginLeft: '6px' }}>
-                    <h3 style={{ fontSize: '0.98rem', fontWeight: '700' }}>{playlist.playlistName}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <h3 style={{ fontSize: '0.98rem', fontWeight: '700', margin: 0 }}>{playlist.playlistName}</h3>
+                      {isPinned && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(234, 179, 8, 0.2)', color: '#facc15', fontSize: '0.62rem', fontWeight: '800' }}>
+                          <i className="fa-solid fa-thumbtack"></i> PINNED
+                        </span>
+                      )}
+                    </div>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                       Playlist • {assignedSongs.length} tracks • By you
                     </p>
@@ -1568,13 +1716,13 @@ export default function LibraryView({
                   key={album.id}
                   className="song-list-item"
                   onClick={() => onSelectAlbum && onSelectAlbum(album)}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', borderRadius: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', borderRadius: '14px', background: 'var(--card-bg, rgba(255,255,255,0.02))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.05))' }}
                 >
                   <div className="list-img-wrapper" style={{ width: '60px', height: '60px' }}>
                     <CachedImage src={album.image} alt={album.name} className="list-track-thumb" style={{ borderRadius: '10px' }} />
                   </div>
                   <div className="list-track-details" style={{ marginLeft: '6px' }}>
-                    <h3 style={{ color: '#ffffff', fontSize: '0.96rem', fontWeight: '700' }}>{album.name}</h3>
+                    <h3 style={{ color: 'var(--text-main)', fontSize: '0.96rem', fontWeight: '700' }}>{album.name}</h3>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                       Album • {album.artist} • {album.trackCount} {album.trackCount === 1 ? 'track' : 'tracks'}
                     </p>
@@ -1585,7 +1733,7 @@ export default function LibraryView({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '60px 24px 20px 24px' }}>
                 <i className="fa-solid fa-compact-disc" style={{ fontSize: '2.2rem', color: 'var(--text-muted)', marginBottom: '16px' }}></i>
-                <h3 style={{ color: '#ffffff', margin: '0 0 8px 0', fontSize: '1rem' }}>No Saved Albums</h3>
+                <h3 style={{ color: 'var(--text-main)', margin: '0 0 8px 0', fontSize: '1rem' }}>No Saved Albums</h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, maxWidth: '260px' }}>
                   {librarySearch ? `No albums match "${librarySearch}".` : 'Open an album and tap the ✓ button to save it here.'}
                 </p>
@@ -1600,7 +1748,7 @@ export default function LibraryView({
                   key={artist.id}
                   className="song-list-item"
                   onClick={() => onSelectArtist && onSelectArtist(artist)}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', borderRadius: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', borderRadius: '14px', background: 'var(--card-bg, rgba(255,255,255,0.02))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.05))' }}
                 >
                   <div className="list-img-wrapper" style={{ width: '60px', height: '60px' }}>
                     {artist.image ? (
@@ -1619,7 +1767,7 @@ export default function LibraryView({
                     )}
                   </div>
                   <div className="list-track-details" style={{ marginLeft: '6px' }}>
-                    <h3 style={{ color: '#ffffff', fontSize: '0.96rem', fontWeight: '700' }}>{artist.name}</h3>
+                    <h3 style={{ color: 'var(--text-main)', fontSize: '0.96rem', fontWeight: '700' }}>{artist.name}</h3>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                       Artist • {artist.songCount} {artist.songCount === 1 ? 'song' : 'songs'}
                     </p>
@@ -1630,7 +1778,7 @@ export default function LibraryView({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '60px 24px 20px 24px' }}>
                 <i className="fa-solid fa-user-large" style={{ fontSize: '2.2rem', color: 'var(--text-muted)', marginBottom: '16px' }}></i>
-                <h3 style={{ color: '#ffffff', margin: '0 0 8px 0', fontSize: '1rem' }}>No Saved Artists</h3>
+                <h3 style={{ color: 'var(--text-main)', margin: '0 0 8px 0', fontSize: '1rem' }}>No Saved Artists</h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, maxWidth: '260px' }}>
                   {librarySearch ? `No artists match "${librarySearch}".` : "Open an artist's profile and tap the ✓ button to save them here."}
                 </p>

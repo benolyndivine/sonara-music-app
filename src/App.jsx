@@ -92,6 +92,16 @@ export default function App() {
   const [lyrics, setLyrics] = useState([]);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [themeId, setThemeId] = useState(getSavedThemeId);
+  const currentTheme = useMemo(() => getThemeById(themeId), [themeId]);
+  const [appTheme, setAppTheme] = useState(() => currentTheme.accent);
+
+  const handleSelectTheme = (newThemeId) => {
+    setThemeId(newThemeId);
+    saveThemeId(newThemeId);
+    const chosen = getThemeById(newThemeId);
+    setAppTheme(chosen.accent);
+  };
 
   const [albums, setAlbums] = useState([]);
   const [selectedAlbum, setSelectedAlbum] = useState(null); 
@@ -176,7 +186,159 @@ export default function App() {
   };
 
   const [isShuffle, setIsShuffle] = useState(false);
-  const [isRepeat, setIsRepeat] = useState(false);
+  const [isRepeat, setIsRepeat] = useState(() => {
+    try { return localStorage.getItem('sonara_repeat_mode') || 'off'; } catch { return 'off'; }
+  });
+
+  const toggleRepeatMode = () => {
+    triggerHaptic(20);
+    setIsRepeat((prev) => {
+      let nextState;
+      if (!prev || prev === 'off' || prev === false) {
+        nextState = 'all';
+        showToast("Repeat All Queue Tracks", "info", "fa-repeat");
+      } else if (prev === 'all' || prev === true) {
+        nextState = 'one';
+        showToast("Repeat Current Track Only", "info", "fa-repeat");
+      } else {
+        nextState = 'off';
+        showToast("Repeat Off", "info", "fa-repeat");
+      }
+      try { localStorage.setItem('sonara_repeat_mode', nextState); } catch (_) {}
+      return nextState;
+    });
+  };
+
+  const timeAdaptiveMix = useMemo(() => {
+    const hour = new Date().getHours();
+    const isLight = currentTheme?.type === 'light';
+    let theme = {
+      title: 'Morning Melody Mix',
+      subtitle: 'Gentle melodies and acoustic vibes to start your day',
+      icon: 'fa-sun',
+      gradient: isLight
+        ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, var(--bg-surface, #fef3c7) 100%)'
+        : 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(20, 20, 20, 0.85) 100%)',
+      accentColor: '#f59e0b',
+      badge: 'MORNING VIBE',
+      genres: ['Melody', 'Classical', 'Acoustic', 'Love']
+    };
+    if (hour >= 12 && hour < 17) {
+      theme = {
+        title: 'Afternoon Energy Rush',
+        subtitle: 'Upbeat tracks and energetic rhythms to power through',
+        icon: 'fa-bolt',
+        gradient: isLight
+          ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.14) 0%, var(--bg-surface, #ffe4e6) 100%)'
+          : 'linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(20, 20, 20, 0.85) 100%)',
+        accentColor: '#f87171',
+        badge: 'AFTERNOON BOOST',
+        genres: ['Party', 'Kollywood', 'Hip Hop', 'Trending']
+      };
+    } else if (hour >= 17 && hour < 22) {
+      theme = {
+        title: 'Evening Sunset Hits',
+        subtitle: 'Smooth favorites and trending melodies for the sunset hours',
+        icon: 'fa-cloud-sun',
+        gradient: isLight
+          ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.14) 0%, var(--bg-surface, #f3e8ff) 100%)'
+          : 'linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(20, 20, 20, 0.85) 100%)',
+        accentColor: '#c084fc',
+        badge: 'EVENING VIBES',
+        genres: ['Melody', 'Kollywood', 'Party', 'Chill']
+      };
+    } else {
+      theme = {
+        title: 'Late Night Calm & Chill',
+        subtitle: 'Soft, relaxing ambient acoustics to wind down and sleep',
+        icon: 'fa-moon',
+        gradient: isLight
+          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.14) 0%, var(--bg-surface, #e2e8f0) 100%)'
+          : 'linear-gradient(135deg, rgba(59, 130, 246, 0.22) 0%, rgba(20, 20, 20, 0.85) 100%)',
+        accentColor: '#60a5fa',
+        badge: 'NIGHT CHILL',
+        genres: ['Chill', 'Melody', 'Devotional', 'Love']
+      };
+    }
+
+    let mixSongs = (songs || []).filter(s => {
+      const g = (s.genre || s.category || '').toLowerCase();
+      return theme.genres.some(tg => g.includes(tg.toLowerCase()));
+    });
+    if (mixSongs.length < 4) {
+      mixSongs = (songs || []).slice(0, 12);
+    }
+    return { ...theme, songs: mixSongs };
+  }, [songs, currentTheme]);
+
+  const jumpBackInItems = useMemo(() => {
+    const items = [];
+    const likedTracks = (songs || []).filter(s => likedSongIds.includes(s.id));
+    items.push({
+      id: 'liked-hub',
+      title: 'Liked Songs',
+      type: 'liked',
+      count: likedTracks.length,
+      image: null,
+      gradient: 'linear-gradient(135deg, #4f46e5 0%, #a855f7 100%)',
+      icon: 'fa-heart',
+      tracks: likedTracks,
+      action: 'play-liked'
+    });
+
+    (playlists || []).slice(0, 3).forEach((p) => {
+      const pTracks = (playlistSongs || [])
+        .filter(ps => ps.playlistId === p.id)
+        .sort((a, b) => (a.orderPosition ?? 0) - (b.orderPosition ?? 0))
+        .map(ps => (songs || []).find(s => s.id === ps.songId))
+        .filter(Boolean);
+      const img = pTracks.length > 0 ? (pTracks[0].cover || pTracks[0].image || pTracks[0].imageUrl) : 'https://placehold.co/100x100/0b111e/1db954.png';
+      items.push({
+        id: `pl-${p.id}`,
+        title: p.playlistName || 'Playlist',
+        type: 'playlist',
+        count: pTracks.length,
+        image: img,
+        tracks: pTracks,
+        playlistObj: p,
+        action: 'open-or-play-playlist'
+      });
+    });
+
+    (albums || []).slice(0, 6 - items.length).forEach((a) => {
+      const aTracks = (songs || []).filter(s => s.albumId === a.id);
+      items.push({
+        id: `alb-${a.id}`,
+        title: a.name || 'Album',
+        type: 'album',
+        count: aTracks.length,
+        image: a.image,
+        tracks: aTracks,
+        albumObj: a,
+        action: 'open-album'
+      });
+    });
+
+    return items.slice(0, 6);
+  }, [songs, likedSongIds, playlists, playlistSongs, albums]);
+
+  const spotlightArtist = useMemo(() => {
+    if (!artists || artists.length === 0) return null;
+    const dayIndex = new Date().getDate() % artists.length;
+    const chosen = artists[dayIndex] || artists[0];
+    const artistTracks = (songs || []).filter(s => {
+      const sa = (s.artist || '').toLowerCase();
+      const an = (chosen.name || '').toLowerCase();
+      return sa.includes(an);
+    });
+    return { ...chosen, tracks: artistTracks };
+  }, [artists, songs]);
+
+  const top10Tracks = useMemo(() => {
+    if (!songs || songs.length === 0) return [];
+    return [...songs].slice(0, 10);
+  }, [songs]);
+
   const [sleepTimeLeft, setSleepTimeLeft] = useState(null);
   const [trackProgress, setTrackProgress] = useState(0);
   const [trackDuration, setTrackDuration] = useState(0);
@@ -197,16 +359,6 @@ export default function App() {
   const setContentRestrictions = (val) => {
     setContentRestrictionsState(val);
     try { localStorage.setItem('sonara_content_restrictions', String(val)); } catch {}
-  };
-  const [themeId, setThemeId] = useState(getSavedThemeId);
-  const currentTheme = useMemo(() => getThemeById(themeId), [themeId]);
-  const [appTheme, setAppTheme] = useState(() => currentTheme.accent);
-
-  const handleSelectTheme = (newThemeId) => {
-    setThemeId(newThemeId);
-    saveThemeId(newThemeId);
-    const chosen = getThemeById(newThemeId);
-    setAppTheme(chosen.accent);
   };
 
   const [motionEnabled, setMotionEnabledState] = useState(() => localStorage.getItem('sonara_motion_enabled') !== 'false');
@@ -493,20 +645,57 @@ export default function App() {
   }, [songs, updateInfo]);
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-
-    const configureStatusBar = async () => {
-      try {
-        await StatusBar.setOverlaysWebView({ overlay: true });
-        const isLightTheme = themeId && themeId.includes('light');
-        await StatusBar.setStyle({ style: isLightTheme ? Style.Light : Style.Dark });
-      } catch (err) {
-        console.warn('Status bar overlay configuration failed:', err);
-      }
+    const root = document.documentElement;
+    const body = document.body;
+    
+    // Globally register theme CSS variables across entire document
+    const cssVars = {
+      '--accent': currentTheme.accent,
+      '--app-bg': currentTheme.appBg,
+      '--bg-dark': currentTheme.bgDark,
+      '--bg-surface': currentTheme.bgSurface,
+      '--text-main': currentTheme.textMain,
+      '--text-muted': currentTheme.textMuted,
+      '--nav-bg': currentTheme.navBg,
+      '--mini-player-bg': currentTheme.miniPlayerBg,
+      '--header-bg': currentTheme.headerBg,
+      '--card-bg': currentTheme.cardBg,
+      '--border-subtle': currentTheme.borderSubtle
     };
+    
+    Object.entries(cssVars).forEach(([k, v]) => {
+      root.style.setProperty(k, v);
+    });
 
-    configureStatusBar();
-  }, [themeId]);
+    body.style.backgroundColor = currentTheme.appBg;
+    body.style.color = currentTheme.textMain;
+
+    if (currentTheme.type === 'light') {
+      root.classList.add('theme-mode-light');
+      root.classList.remove('theme-mode-dark');
+      body.classList.add('theme-mode-light');
+      body.classList.remove('theme-mode-dark');
+    } else {
+      root.classList.add('theme-mode-dark');
+      root.classList.remove('theme-mode-light');
+      body.classList.add('theme-mode-dark');
+      body.classList.remove('theme-mode-light');
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      (async () => {
+        try {
+          await StatusBar.setOverlaysWebView({ overlay: true });
+          await StatusBar.setStyle({ style: currentTheme.type === 'light' ? Style.Light : Style.Dark });
+          if (StatusBar.setBackgroundColor) {
+            await StatusBar.setBackgroundColor({ color: currentTheme.appBg });
+          }
+        } catch (err) {
+          console.warn('Status bar overlay configuration failed:', err);
+        }
+      })();
+    }
+  }, [currentTheme]);
 
   const ensureStoragePermission = async () => {
     if (!Capacitor.isNativePlatform()) return true;
@@ -816,9 +1005,17 @@ export default function App() {
         .catch(() => {});
     }
 
+    let prevRouteWasHeadphones = false;
     AudioRouteInfo.addListener('audioRouteChanged', (status) => {
       if (!cancelled && status) {
         setAudioRoute(status);
+        const autoPauseSetting = localStorage.getItem('sonara_autopause_disconnect') !== 'false';
+        const isNowSpeaker = status.deviceType === 'speaker' || !status.connected;
+        if (autoPauseSetting && prevRouteWasHeadphones && isNowSpeaker && audioStateRef.current.isPlaying) {
+          setIsPlaying(false);
+          showToast("Playback paused (Audio disconnected)", "info", "fa-pause");
+        }
+        prevRouteWasHeadphones = Boolean(status.connected && status.deviceType !== 'speaker');
       }
     }).then((handle) => { listenerHandle = handle; });
 
@@ -1000,7 +1197,12 @@ export default function App() {
       if (!dur || dur <= 0) return;
       media.getCurrentPosition().then((pos) => {
         if (!isCrossfadingRef.current && pos != null && pos >= dur - 1) {
-          triggerNextTrackLogic();
+          const { isRepeat: r, currentTrack: ct } = audioStateRef.current;
+          if (r === 'one' && ct) {
+            startNativeTrack(ct, true);
+          } else {
+            triggerNextTrackLogic();
+          }
         }
       }).catch(() => {});
     }, 3000);
@@ -1158,7 +1360,7 @@ export default function App() {
       if (isCrossfadingRef.current) return;
       if (Date.now() - lastTrackChangeAtRef.current < 10000) return;
       const { isRepeat: r } = audioStateRef.current;
-      if (r) {
+      if (r === 'one') {
         startNativeTrack(next, true);
       } else {
         triggerNextTrackLogic();
@@ -1192,7 +1394,7 @@ export default function App() {
 
             // Crossfade check for incoming track (must play >= 15s to prevent immediate chained triggers)
             const { crossfadeEnabled: cfOn, crossfadeDuration: cfDur, isRepeat: r } = audioStateRef.current;
-            if (cfOn && cfDur !== 'Off' && !r && !isCrossfadingRef.current && dur > 8 && (Date.now() - lastTrackChangeAtRef.current > 15000)) {
+            if (cfOn && cfDur !== 'Off' && r !== 'one' && !isCrossfadingRef.current && dur > 8 && (Date.now() - lastTrackChangeAtRef.current > 15000)) {
               const durSec = parseInt(cfDur, 10) || 0;
               const timeLeft = dur - pos;
               if (durSec > 0 && timeLeft <= durSec && timeLeft > 0.4) {
@@ -1346,38 +1548,53 @@ export default function App() {
     if (sh) {
       if (queue.length > 1) {
         if (!shuffleBagRef.current || shuffleBagRef.current.length === 0) {
-          if (!autoInf) {
-            setIsPlaying(false);
-            return;
-          }
-          const similar = findSimilarTrack(t, s, playHistoryRef.current);
-          if (similar && similar.id !== t?.id) {
-            next = similar;
-          } else {
-            const remainingIds = queue.filter(track => track.id !== t?.id).map(track => track.id);
+          const { isRepeat: r } = audioStateRef.current;
+          if (r === 'all' || r === true) {
+            const remainingIds = queue.map(track => track.id);
             shuffleBagRef.current = shuffleArray(remainingIds);
             const nextId = shuffleBagRef.current.shift();
             next = queue.find(track => track.id === nextId) || queue[0];
+          } else if (!autoInf) {
+            setIsPlaying(false);
+            return;
+          } else {
+            const similar = findSimilarTrack(t, s, playHistoryRef.current);
+            if (similar && similar.id !== t?.id) {
+              next = similar;
+            } else {
+              const remainingIds = queue.filter(track => track.id !== t?.id).map(track => track.id);
+              shuffleBagRef.current = shuffleArray(remainingIds);
+              const nextId = shuffleBagRef.current.shift();
+              next = queue.find(track => track.id === nextId) || queue[0];
+            }
           }
         } else {
           const nextId = shuffleBagRef.current.shift();
           next = queue.find(track => track.id === nextId) || queue[0];
         }
       } else {
-        if (!autoInf) {
+        const { isRepeat: r } = audioStateRef.current;
+        if (r === 'all' || r === true || r === 'one') {
+          next = queue[0];
+        } else if (!autoInf) {
           setIsPlaying(false);
           return;
+        } else {
+          next = findSimilarTrack(t, s, playHistoryRef.current) || queue[0];
         }
-        next = findSimilarTrack(t, s, playHistoryRef.current) || queue[0];
       }
     } else {
       const idx = queue.findIndex(track => track.id === t?.id);
       if (idx === queue.length - 1) {
-        if (!autoInf) {
+        const { isRepeat: r } = audioStateRef.current;
+        if (r === 'all' || r === true) {
+          next = queue[0];
+        } else if (!autoInf) {
           setIsPlaying(false);
           return;
+        } else {
+          next = findSimilarTrack(t, s, playHistoryRef.current) || queue[0];
         }
-        next = findSimilarTrack(t, s, playHistoryRef.current) || queue[0];
       } else {
         next = queue[(idx + 1) % queue.length];
       }
@@ -1509,7 +1726,7 @@ export default function App() {
       if (isCrossfadingRef.current) return;
       if (Date.now() - lastTrackChangeAtRef.current < 10000) return;
       const { isRepeat: r } = audioStateRef.current;
-      if (r) {
+      if (r === 'one') {
         startNativeTrack(track, true);
       } else {
         triggerNextTrackLogic();
@@ -1524,6 +1741,8 @@ export default function App() {
 
     if (autoplay) {
       media.play();
+      try { media.setVolume(1.0); } catch (_) {}
+      applyAudioEffectsToNative(media, { speed: playbackSpeed });
       if (seekTime > 0 && typeof media.seekTo === 'function') {
         setTimeout(() => {
           try { media.seekTo(seekTime * 1000); } catch (_) {}
@@ -1548,7 +1767,7 @@ export default function App() {
 
             // Native Crossfade transition check (only when playing for at least 15s)
             const { crossfadeEnabled: cfOn, crossfadeDuration: cfDur, isRepeat: r } = audioStateRef.current;
-            if (cfOn && cfDur !== 'Off' && !r && !isCrossfadingRef.current && dur > 8 && (Date.now() - lastTrackChangeAtRef.current > 15000)) {
+            if (cfOn && cfDur !== 'Off' && r !== 'one' && !isCrossfadingRef.current && dur > 8 && (Date.now() - lastTrackChangeAtRef.current > 15000)) {
               const durSec = parseInt(cfDur, 10) || 0;
               const timeLeft = dur - pos;
               if (durSec > 0 && timeLeft <= durSec && timeLeft > 0.4) {
@@ -1740,7 +1959,7 @@ export default function App() {
 
       // Check for Crossfade transition (only after track has played for at least 15s)
       const { crossfadeEnabled: cfOn, crossfadeDuration: cfDur, isRepeat: r } = audioStateRef.current;
-      if (cfOn && cfDur !== 'Off' && !r && !isCrossfadingRef.current && audio.duration > 8 && (Date.now() - lastTrackChangeAtRef.current > 15000)) {
+      if (cfOn && cfDur !== 'Off' && r !== 'one' && !isCrossfadingRef.current && audio.duration > 8 && (Date.now() - lastTrackChangeAtRef.current > 15000)) {
         const durSec = parseInt(cfDur, 10) || 0;
         const timeLeft = audio.duration - audio.currentTime;
         if (durSec > 0 && timeLeft <= durSec && timeLeft > 0.4) {
@@ -1766,7 +1985,7 @@ export default function App() {
         return;
       }
       const { isRepeat: r } = audioStateRef.current;
-      if (r) {
+      if (r === 'one') {
         audioRef.current.currentTime = 0;
         audioRef.current.play().catch(() => {});
       } else {
@@ -1891,6 +2110,22 @@ export default function App() {
   useEffect(() => {
     if (sleepTimeLeft === null || sleepTimeLeft === 'end_of_song') return;
     if (sleepTimeLeft <= 0) {
+      const shouldFade = localStorage.getItem('sonara_sleep_timer_fade') === 'true';
+      if (shouldFade) {
+        const activeTarget = Capacitor.isNativePlatform() ? mediaRef.current : audioRef.current;
+        if (activeTarget) {
+          fadeVolume(activeTarget, 1.0, 0, 6000, () => {
+            setIsPlaying(false);
+            setSleepTimeLeft(null);
+            showToast("Sleep timer completed — gentle fade out finished", "info", "fa-moon");
+            try {
+              if (Capacitor.isNativePlatform() && mediaRef.current) mediaRef.current.setVolume(1.0);
+              else if (audioRef.current) audioRef.current.volume = 1.0;
+            } catch (_) {}
+          });
+          return;
+        }
+      }
       setIsPlaying(false);
       setSleepTimeLeft(null);
       showToast("Sleep timer completed — music paused", "info", "fa-moon");
@@ -2420,7 +2655,7 @@ export default function App() {
               {!isOnline ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center', padding: '0 24px' }}>
                   <i className="fa-solid fa-wifi" style={{ fontSize: '2.4rem', color: 'var(--text-muted)', marginBottom: '16px' }}></i>
-                  <h3 style={{ color: '#ffffff', margin: '0 0 8px 0' }}>No Internet Available</h3>
+                  <h3 style={{ color: 'var(--text-main, #ffffff)', margin: '0 0 8px 0' }}>No Internet Available</h3>
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
                     Home needs a connection to load new content. Check your Library's Downloaded tab to play music offline.
                   </p>
@@ -2435,6 +2670,17 @@ export default function App() {
                     <h1 className="home-greeting-title">
                       {greetingText}{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}
                     </h1>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, rgba(255,255,255,0.6))', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <i className="fa-solid fa-heart" style={{ color: 'var(--accent)', fontSize: '0.68rem' }}></i>
+                        {likedSongIds.length} Favorites
+                      </span>
+                      <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)' }}>•</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, rgba(255,255,255,0.6))', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <i className="fa-solid fa-compact-disc" style={{ color: '#38bdf8', fontSize: '0.68rem' }}></i>
+                        {songs.length} Tracks
+                      </span>
+                    </div>
                   </div>
 
                   {/* 🌟 Quick Filter Chips */}
@@ -2467,6 +2713,217 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+
+                  {/* 🌟 Jump Back In (Bento 6-Tile Fast Launcher) */}
+                  {jumpBackInItems.length > 0 && (
+                    <div style={{ margin: '14px 0 6px 0' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                        {jumpBackInItems.map((item) => {
+                          const isCurrentlyPlayingThisHub = isPlaying && item.tracks && item.tracks.length > 0 && currentTrack && item.tracks.some(t => t.id === currentTrack.id);
+                          return (
+                            <div
+                              key={item.id}
+                              className="bento-6-tile home-bento-hero-tile"
+                              onClick={() => {
+                                triggerHaptic(20);
+                                if (item.action === 'play-liked') {
+                                  if (item.tracks.length > 0) {
+                                    handleTrackSelection(item.tracks[0], item.tracks);
+                                  } else {
+                                    showToast("No liked songs yet! Tap heart on any song.", "info", "fa-heart");
+                                  }
+                                } else if (item.action === 'open-or-play-playlist') {
+                                  if (item.tracks.length > 0) {
+                                    handleTrackSelection(item.tracks[0], item.tracks);
+                                  } else {
+                                    openDetailView({ playlist: item.playlistObj });
+                                  }
+                                } else if (item.action === 'open-album') {
+                                  openDetailView({ album: item.albumObj });
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                height: '54px',
+                                borderRadius: '8px',
+                                background: isCurrentlyPlayingThisHub ? 'rgba(29, 185, 84, 0.14)' : 'var(--card-bg, rgba(255, 255, 255, 0.05))',
+                                border: isCurrentlyPlayingThisHub ? '1px solid rgba(29, 185, 84, 0.35)' : '1px solid var(--border-subtle, rgba(255, 255, 255, 0.07))',
+                                overflow: 'hidden',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: '54px',
+                                  height: '54px',
+                                  flexShrink: 0,
+                                  background: item.gradient || '#181818',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                {item.icon ? (
+                                  <i className={`fa-solid ${item.icon}`} style={{ fontSize: '1.25rem', color: '#fff' }}></i>
+                                ) : (
+                                  <CachedImage
+                                    src={item.image}
+                                    alt={item.title}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                )}
+                              </div>
+
+                              <div style={{ flex: 1, padding: '0 8px 0 10px', overflow: 'hidden' }}>
+                                <div
+                                  style={{
+                                    fontSize: '0.82rem',
+                                    fontWeight: '700',
+                                    color: isCurrentlyPlayingThisHub ? 'var(--accent)' : 'var(--text-main, #ffffff)',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    lineHeight: 1.25
+                                  }}
+                                >
+                                  {item.title}
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, rgba(255, 255, 255, 0.45))', marginTop: '2px' }}>
+                                  {item.count} track{item.count !== 1 ? 's' : ''}
+                                </div>
+                              </div>
+
+                              {isCurrentlyPlayingThisHub && (
+                                <div style={{ paddingRight: '10px', flexShrink: 0 }}>
+                                  <i className="fa-solid fa-volume-high" style={{ color: 'var(--accent)', fontSize: '0.8rem' }}></i>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 🌟 Time-Adaptive Daily Mix Hero Banner */}
+                  {timeAdaptiveMix && timeAdaptiveMix.songs && timeAdaptiveMix.songs.length > 0 && (
+                    <div
+                      style={{
+                        margin: '18px 0 24px 0',
+                        padding: '18px 20px',
+                        borderRadius: '20px',
+                        background: timeAdaptiveMix.gradient,
+                        border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
+                        boxShadow: '0 8px 28px rgba(0, 0, 0, 0.08)',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '14px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '100px',
+                            background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                            fontSize: '0.68rem',
+                            fontWeight: '800',
+                            letterSpacing: '0.08em',
+                            color: timeAdaptiveMix.accentColor,
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          <i className={`fa-solid ${timeAdaptiveMix.icon}`}></i>
+                          {timeAdaptiveMix.badge}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                          {timeAdaptiveMix.songs.length} Tracks
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                        <div style={{ flex: 1 }}>
+                          <h2 style={{ fontSize: '1.3rem', fontWeight: '800', margin: '0 0 6px 0', color: 'var(--text-main, #fff)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                            {timeAdaptiveMix.title}
+                          </h2>
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                            {timeAdaptiveMix.subtitle}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleTrackSelection(timeAdaptiveMix.songs[0], timeAdaptiveMix.songs)}
+                          style={{
+                            width: '46px',
+                            height: '46px',
+                            borderRadius: '50%',
+                            background: timeAdaptiveMix.accentColor,
+                            color: '#ffffff',
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.05rem',
+                            boxShadow: `0 6px 20px ${timeAdaptiveMix.accentColor}55`,
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                          }}
+                          onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.92)'}
+                          onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                          <i className="fa-solid fa-play" style={{ marginLeft: '2px' }}></i>
+                        </button>
+                      </div>
+
+                      {/* Mini Track Previews */}
+                      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px', scrollbarWidth: 'none' }}>
+                        {timeAdaptiveMix.songs.slice(0, 5).map((s, idx) => {
+                          const img = s.cover || s.image || s.imageUrl || s.coverUrl;
+                          const isCur = currentTrack?.id === s.id;
+                          return (
+                            <div
+                              key={s.id || idx}
+                              onClick={() => handleTrackSelection(s, timeAdaptiveMix.songs)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '6px 10px 6px 6px',
+                                borderRadius: '12px',
+                                background: isCur ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'color-mix(in srgb, var(--text-main) 5%, transparent)',
+                                border: isCur ? `1px solid ${timeAdaptiveMix.accentColor}` : '1px solid var(--border-subtle, rgba(255,255,255,0.06))',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                maxWidth: '175px',
+                              }}
+                            >
+                              <CachedImage
+                                src={img || 'https://placehold.co/80x80/0b111e/1db954.png'}
+                                alt={s.title || ''}
+                                style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }}
+                              />
+                              <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                                <div style={{ fontSize: '0.74rem', fontWeight: '700', color: isCur ? timeAdaptiveMix.accentColor : 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {s.title || s.name}
+                                </div>
+                                <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {s.artist || 'Unknown'}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
               {/* 🌟 Recently Played Row */}
               {recentlyPlayed.length > 0 && (
@@ -2556,6 +3013,119 @@ export default function App() {
                 </div>
               </section>
 
+              {/* 🏆 Weekly Top 10 Chart Countdown */}
+              {top10Tracks.length > 0 && (
+                <section className="content-section" style={{ marginBottom: '28px' }}>
+                  <div className="section-header-container">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h2 style={{ margin: 0 }}>Top 10 Chart Countdown</h2>
+                      <span style={{ fontSize: '0.66rem', fontWeight: '800', background: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24', padding: '2px 8px', borderRadius: '100px', letterSpacing: '0.04em' }}>
+                        <i className="fa-solid fa-fire"></i> TRENDING
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        triggerHaptic(20);
+                        handleTrackSelection(top10Tracks[0], top10Tracks);
+                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                    >
+                      <i className="fa-solid fa-play" style={{ fontSize: '0.72rem' }}></i> Play Countdown
+                    </button>
+                  </div>
+                  <div className="horizontal-scroll" style={{ display: 'flex', gap: '14px', overflowX: 'auto', paddingBottom: '10px' }}>
+                    {top10Tracks.map((song, idx) => {
+                      const songImg = song.cover || song.image || song.imageUrl || song.coverUrl;
+                      const songTitle = song.title || song.name || 'Untitled';
+                      const isLiked = likedSongIds.includes(song.id || songTitle);
+                      const isCurrent = currentTrack && song.id === currentTrack.id;
+                      const rank = idx + 1;
+                      const isGold = rank === 1;
+                      const isSilver = rank === 2;
+                      const isBronze = rank === 3;
+                      const badgeColor = isGold ? '#fbbf24' : isSilver ? '#e2e8f0' : isBronze ? '#f97316' : '#94a3b8';
+                      const badgeBg = isGold ? 'rgba(251, 191, 36, 0.25)' : isSilver ? 'rgba(226, 232, 240, 0.2)' : isBronze ? 'rgba(249, 115, 22, 0.2)' : 'rgba(0, 0, 0, 0.55)';
+
+                      return (
+                        <div
+                          key={`top10-${song.id || idx}`}
+                          className="song-card home-top10-card"
+                          onClick={() => handleTrackSelection(song, top10Tracks)}
+                          style={{
+                            cursor: 'pointer',
+                            position: 'relative',
+                            minWidth: '140px',
+                            maxWidth: '140px',
+                            borderRadius: '14px',
+                            overflow: 'hidden',
+                            background: isCurrent ? 'rgba(29, 185, 84, 0.08)' : 'transparent',
+                            transition: 'transform 0.15s ease',
+                          }}
+                        >
+                          <div className="img-container" style={{ position: 'relative', width: '140px', height: '140px' }}>
+                            <CachedImage src={songImg || 'https://placehold.co/140x140/0b111e/1db954.png'} alt={songTitle} style={{ borderRadius: '12px', width: '100%', height: '100%', objectFit: 'cover' }} />
+                            
+                            {/* Rank Ribbon Badge */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '8px',
+                                left: '8px',
+                                background: badgeBg,
+                                backdropFilter: 'blur(8px)',
+                                border: `1px solid ${badgeColor}66`,
+                                borderRadius: '8px',
+                                padding: '3px 7px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                color: badgeColor,
+                                fontWeight: '900',
+                                fontSize: '0.78rem',
+                                boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+                              }}
+                            >
+                              {isGold && <i className="fa-solid fa-crown" style={{ fontSize: '0.7rem' }}></i>}
+                              {isSilver && <i className="fa-solid fa-medal" style={{ fontSize: '0.7rem' }}></i>}
+                              {isBronze && <i className="fa-solid fa-award" style={{ fontSize: '0.7rem' }}></i>}
+                              <span>#{rank}</span>
+                            </div>
+
+                            {/* Floating Like Button */}
+                            <button
+                              onClick={(e) => toggleLikeSong(song, e)}
+                              style={{
+                                position: 'absolute',
+                                bottom: '8px',
+                                right: '8px',
+                                background: 'rgba(0,0,0,0.65)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '50%',
+                                width: '30px',
+                                height: '30px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                color: isLiked ? 'var(--accent)' : '#fff'
+                              }}
+                            >
+                              <i className={`fa-${isLiked ? 'solid' : 'regular'} fa-heart`} style={{ fontSize: '0.85rem' }}></i>
+                            </button>
+                          </div>
+                          <h3 style={{ fontSize: '0.85rem', margin: '8px 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: isCurrent ? 'var(--accent)' : 'var(--text-main, #ffffff)' }}>
+                            {songTitle}
+                          </h3>
+                          <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {song.artist || 'Unknown'}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
               <SongRow
                 title={homeFilter === 'Trending' ? "Trending Hits" : "Popular Songs"}
                 songs={songs}
@@ -2604,6 +3174,195 @@ export default function App() {
                   )}
                 </div>
               </section>
+
+              {/* 🌟 Featured Artist of the Day Spotlight */}
+              {spotlightArtist && (
+                <section className="content-section" style={{ marginBottom: '28px' }}>
+                  <div
+                    className="spotlight-artist-container settings-glass-card"
+                    style={{
+                      borderRadius: '20px',
+                      background: 'linear-gradient(135deg, var(--card-bg, rgba(30, 41, 59, 0.75)) 0%, var(--bg-surface, rgba(15, 23, 42, 0.95)) 100%)',
+                      border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
+                      padding: '20px',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '4px 10px',
+                          borderRadius: '100px',
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          color: '#38bdf8',
+                          fontSize: '0.66rem',
+                          fontWeight: '800',
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase'
+                        }}
+                      >
+                        <i className="fa-solid fa-star"></i> ARTIST SPOTLIGHT
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, rgba(255,255,255,0.6))', fontWeight: '600' }}>
+                        Daily Highlight
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      {spotlightArtist.image ? (
+                        <CachedImage
+                          src={spotlightArtist.image}
+                          alt={spotlightArtist.name}
+                          style={{
+                            width: '84px',
+                            height: '84px',
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            flexShrink: 0,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                            border: '2px solid rgba(56, 189, 248, 0.4)'
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '84px',
+                            height: '84px',
+                            borderRadius: '50%',
+                            background: 'var(--accent)',
+                            color: '#000',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.8rem',
+                            fontWeight: '800',
+                            flexShrink: 0
+                          }}
+                        >
+                          {(spotlightArtist.name || 'A').charAt(0)}
+                        </div>
+                      )}
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '800', color: 'var(--text-main, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {spotlightArtist.name}
+                          </h3>
+                          <i className="fa-solid fa-circle-check" style={{ color: '#38bdf8', fontSize: '0.85rem' }}></i>
+                        </div>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted, rgba(255,255,255,0.65))' }}>
+                          Verified Artist • {spotlightArtist.tracks.length} track{spotlightArtist.tracks.length !== 1 ? 's' : ''} in catalog
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        onClick={() => {
+                          triggerHaptic(20);
+                          if (spotlightArtist.tracks.length > 0) {
+                            handleTrackSelection(spotlightArtist.tracks[0], spotlightArtist.tracks);
+                          } else {
+                            openDetailView({ artist: spotlightArtist });
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          height: '42px',
+                          borderRadius: '12px',
+                          background: 'var(--accent)',
+                          color: '#000000',
+                          border: 'none',
+                          fontWeight: '800',
+                          fontSize: '0.85rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 14px rgba(29, 185, 84, 0.4)'
+                        }}
+                      >
+                        <i className="fa-solid fa-play" style={{ fontSize: '0.8rem' }}></i>
+                        <span>Play Radio</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          triggerHaptic(20);
+                          openDetailView({ artist: spotlightArtist });
+                        }}
+                        style={{
+                          height: '42px',
+                          padding: '0 16px',
+                          borderRadius: '12px',
+                          background: 'var(--card-bg, rgba(255, 255, 255, 0.08))',
+                          color: 'var(--text-main, #ffffff)',
+                          border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.12))',
+                          fontWeight: '700',
+                          fontSize: '0.82rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <span>View Discography</span>
+                        <i className="fa-solid fa-chevron-right" style={{ fontSize: '0.7rem' }}></i>
+                      </button>
+                    </div>
+
+                    {/* Quick Sample Tracks */}
+                    {spotlightArtist.tracks.length > 0 && (
+                      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px', scrollbarWidth: 'none' }}>
+                        {spotlightArtist.tracks.slice(0, 4).map((s, idx) => {
+                          const img = s.cover || s.image || s.imageUrl || s.coverUrl;
+                          const isCur = currentTrack?.id === s.id;
+                          return (
+                            <div
+                              key={s.id || idx}
+                              onClick={() => handleTrackSelection(s, spotlightArtist.tracks)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '6px 10px 6px 6px',
+                                borderRadius: '10px',
+                                background: isCur ? 'rgba(56, 189, 248, 0.2)' : 'rgba(0,0,0,0.3)',
+                                border: isCur ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.06)',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                maxWidth: '160px'
+                              }}
+                            >
+                              <CachedImage
+                                src={img || 'https://placehold.co/60x60/0b111e/1db954.png'}
+                                alt=""
+                                style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'cover' }}
+                              />
+                              <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                                <div style={{ fontSize: '0.72rem', fontWeight: '700', color: isCur ? '#38bdf8' : 'var(--text-main, #ffffff)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {s.title || s.name}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
 
               <ArtistRow
                 title="Popular Artists"
@@ -2687,6 +3446,7 @@ export default function App() {
           playlistSongs={playlistSongs}
           currentTrack={currentTrack}
           isPlaying={isPlaying}
+          likedSongIds={likedSongIds}
           isShuffle={isShuffle}
           onToggleShuffle={toggleShuffle}
           onTogglePlay={togglePlayPause}
@@ -2760,13 +3520,13 @@ export default function App() {
       {showQueueModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999,
+          backgroundColor: 'var(--bg-dark, #05070c)', zIndex: 9999,
           display: 'flex', flexDirection: 'column', padding: '24px 20px',
           boxSizing: 'border-box', animation: 'slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 style={{ color: '#fff', margin: 0, fontSize: '1.25rem' }}>Up Next / Queue</h2>
-            <button onClick={handleAppBack} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>
+            <h2 style={{ color: 'var(--text-main, #fff)', margin: 0, fontSize: '1.25rem' }}>Up Next / Queue</h2>
+            <button onClick={handleAppBack} style={{ background: 'none', border: 'none', color: 'var(--text-main, #fff)', fontSize: '1.2rem', cursor: 'pointer' }}>
               <i className="fa-solid fa-xmark"></i>
             </button>
           </div>
@@ -2781,14 +3541,14 @@ export default function App() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: '12px',
                     padding: '10px', borderRadius: '12px',
-                    backgroundColor: isCurrent ? 'rgba(29, 185, 84, 0.15)' : 'rgba(255, 255, 255, 0.03)',
-                    border: isCurrent ? '1px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.06)',
+                    backgroundColor: isCurrent ? 'rgba(29, 185, 84, 0.15)' : 'var(--card-bg, rgba(255, 255, 255, 0.03))',
+                    border: isCurrent ? '1px solid var(--accent)' : '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
                     cursor: 'pointer'
                   }}
                 >
                   <CachedImage src={img || 'https://placehold.co/100x100/0b111e/1db954.png'} alt="" style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover' }} />
                   <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <p style={{ margin: '0 0 2px 0', fontSize: '0.9rem', color: isCurrent ? 'var(--accent)' : '#fff', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '0.9rem', color: isCurrent ? 'var(--accent)' : 'var(--text-main, #fff)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {track.title || track.name}
                     </p>
                     <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -2826,7 +3586,7 @@ export default function App() {
           onPrev={triggerPrevTrackLogic}
           onSeekProgress={handleSeekProgress}
           onToggleShuffle={toggleShuffle}
-          onToggleRepeat={() => setIsRepeat(!isRepeat)}
+          onToggleRepeat={toggleRepeatMode}
           onSetSleepTimer={setSleepTimeLeft}
           onAddSongToPlaylist={addSongToPlaylist}
           onGoToAlbum={handleGoToAlbum}

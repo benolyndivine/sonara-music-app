@@ -132,7 +132,7 @@ export default function ArtistDetailsView({
           boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
         }}>
           <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
-          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-main)' }}>{toastMessage}</span>
         </div>
       )}
 
@@ -144,7 +144,7 @@ export default function ArtistDetailsView({
             style={{
               width: '38px', height: '38px', borderRadius: '50%',
               backgroundColor: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: '#ffffff', cursor: 'pointer', fontSize: '1rem',
+              color: 'var(--text-main)', cursor: 'pointer', fontSize: '1rem',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
             aria-label="Back"
@@ -185,7 +185,7 @@ export default function ArtistDetailsView({
 
         {/* Artist Name & Stats */}
         <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-          <h2 style={{ margin: '0 0 6px 0', fontSize: '1.85rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.6px' }}>
+          <h2 style={{ margin: '0 0 6px 0', fontSize: '1.85rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.6px' }}>
             {artist.name}
           </h2>
           <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: '500' }}>
@@ -212,7 +212,7 @@ export default function ArtistDetailsView({
               style={{
                 width: '38px', height: '38px', borderRadius: '50%',
                 backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#ffffff', cursor: 'pointer', display: 'flex',
+                color: 'var(--text-main)', cursor: 'pointer', display: 'flex',
                 alignItems: 'center', justifyContent: 'center', fontSize: '0.95rem'
               }}
               title="Share artist"
@@ -285,7 +285,7 @@ export default function ArtistDetailsView({
               onClick={() => setSortBy('all')}
               style={{
                 padding: '5px 12px', borderRadius: '14px', border: 'none',
-                backgroundColor: sortBy === 'all' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                backgroundColor: sortBy === 'all' ? 'var(--accent)' : 'var(--card-bg, rgba(255, 255, 255, 0.04))', color: sortBy === 'all' ? '#000' : 'var(--text-main)',
                 color: sortBy === 'all' ? 'var(--accent)' : 'var(--text-muted)',
                 fontSize: '0.74rem', fontWeight: '700', cursor: 'pointer'
               }}
@@ -296,7 +296,7 @@ export default function ArtistDetailsView({
               onClick={() => setSortBy('az')}
               style={{
                 padding: '5px 12px', borderRadius: '14px', border: 'none',
-                backgroundColor: sortBy === 'az' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                backgroundColor: sortBy === 'az' ? 'var(--accent)' : 'var(--card-bg, rgba(255, 255, 255, 0.04))', color: sortBy === 'az' ? '#000' : 'var(--text-main)',
                 color: sortBy === 'az' ? 'var(--accent)' : 'var(--text-muted)',
                 fontSize: '0.74rem', fontWeight: '700', cursor: 'pointer'
               }}

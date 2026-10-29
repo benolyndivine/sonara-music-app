@@ -90,7 +90,7 @@ export default function ManageGenresView({ songs = [], onBack, onGenreSaved }) {
       className="mgv-hide-scrollbar"
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: '#05070c', zIndex: 650,
+        backgroundColor: 'var(--bg-dark, #05070c)', zIndex: 650,
         padding: 'calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 48px)',
         display: 'flex', flexDirection: 'column', boxSizing: 'border-box', overflowY: 'auto',
         animation: 'slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)'
@@ -103,7 +103,7 @@ export default function ManageGenresView({ songs = [], onBack, onGenreSaved }) {
           <i className="fa-solid fa-arrow-left"></i>
         </button>
         <div style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', color: '#fff' }}>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-main)' }}>
             {selectedSong ? 'Set Song Genre' : 'Genre Manager'}
           </h2>
           <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
@@ -122,7 +122,7 @@ export default function ManageGenresView({ songs = [], onBack, onGenreSaved }) {
               style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }}
             />
             <div>
-              <h3 style={{ margin: 0, fontSize: '1rem', color: '#fff' }}>{selectedSong.title || selectedSong.name}</h3>
+              <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-main)' }}>{selectedSong.title || selectedSong.name}</h3>
               <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>{selectedSong.artist || 'Unknown Artist'}</p>
             </div>
           </div>
@@ -152,7 +152,7 @@ export default function ManageGenresView({ songs = [], onBack, onGenreSaved }) {
                 >
                   <i className={previewPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play'}></i>
                 </button>
-                <div style={{ fontSize: '0.8rem', color: '#fff' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-main)' }}>
                   <p style={{ margin: 0, fontWeight: '600' }}>Preview Track Audio</p>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Listen before tagging genre</span>
                 </div>
@@ -204,7 +204,7 @@ export default function ManageGenresView({ songs = [], onBack, onGenreSaved }) {
               <button
                 type="button"
                 onClick={() => setSelectedSong(null)}
-                style={{ flex: 1, padding: 12, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: '700', cursor: 'pointer' }}
+                style={{ flex: 1, padding: 12, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--text-main)', fontWeight: '700', cursor: 'pointer' }}
               >
                 Cancel
               </button>
@@ -268,7 +268,7 @@ export default function ManageGenresView({ songs = [], onBack, onGenreSaved }) {
                       style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover' }}
                     />
                     <div style={{ overflow: 'hidden' }}>
-                      <p style={{ margin: 0, fontSize: '0.88rem', color: '#fff', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-main)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {song.title || song.name}
                       </p>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -294,7 +294,7 @@ export default function ManageGenresView({ songs = [], onBack, onGenreSaved }) {
   );
 }
 
-const iconBtnStyle = { width: 40, height: 40, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
+const iconBtnStyle = { width: 40, height: 40, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
 const tabButtonStyle = (active) => ({
   flex: 1, padding: '10px', borderRadius: 10, border: 'none',
   backgroundColor: active ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
@@ -302,7 +302,7 @@ const tabButtonStyle = (active) => ({
 });
 const cardStyle = { backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 18, padding: '20px' };
 const labelStyle = { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 6, fontWeight: '700', textTransform: 'uppercase' };
-const inputStyle = { width: '100%', height: 44, backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '0 14px', color: '#fff', outline: 'none', boxSizing: 'border-box', fontSize: '0.85rem' };
+const inputStyle = { width: '100%', height: 44, backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '0 14px', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box', fontSize: '0.85rem' };
 
 const manageGenresStyles = `
   .mgv-hide-scrollbar::-webkit-scrollbar { display: none; }

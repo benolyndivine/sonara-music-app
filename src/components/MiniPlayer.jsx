@@ -58,7 +58,7 @@ export default function MiniPlayer({ currentTrack, isPlaying, trackProgress, tra
             onToggleLike && onToggleLike(currentTrack, e);
           }}
           title={isLiked ? "Unlike track" : "Like track"}
-          style={{ color: isLiked ? 'var(--accent)' : 'rgba(255, 255, 255, 0.65)', fontSize: '1rem' }}
+          style={{ color: isLiked ? 'var(--accent)' : 'var(--text-muted, rgba(255, 255, 255, 0.65))', fontSize: '1rem' }}
         >
           <i className={`fa-${isLiked ? 'solid' : 'regular'} fa-heart`}></i>
         </button>

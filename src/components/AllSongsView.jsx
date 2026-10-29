@@ -64,7 +64,7 @@ export default function AllSongsView({ songs, currentTrack, isPlaying, onSelectT
           boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
         }}>
           <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
-          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-main)' }}>{toastMessage}</span>
         </div>
       )}
 

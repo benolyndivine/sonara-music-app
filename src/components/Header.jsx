@@ -94,7 +94,7 @@ export default function Header({ user, onOpenProfile, onViewChange, onOpenNotifi
           <span style={{
             position: 'absolute', bottom: '-1px', right: '-1px',
             width: '12px', height: '12px', backgroundColor: '#1db954',
-            border: '2px solid #05070c', borderRadius: '50%', zIndex: 5
+            border: '2px solid var(--header-bg, #05070c)', borderRadius: '50%', zIndex: 5
           }}></span>
         </div>
       </div>

@@ -50,7 +50,7 @@ export default function ManageCanvasVideosView({ songs = [], onBack, onSongUpdat
       className="mcv-hide-scrollbar"
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: '#05070c', zIndex: 650,
+        backgroundColor: 'var(--bg-dark, #05070c)', zIndex: 650,
         padding: 'calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 48px)',
         display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
         overflowY: 'auto',
@@ -66,13 +66,13 @@ export default function ManageCanvasVideosView({ songs = [], onBack, onSongUpdat
           style={{
             width: '42px', height: '42px', borderRadius: '50%',
             backgroundColor: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.12)',
-            color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+            color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
           }}
         >
           <i className="fa-solid fa-arrow-left"></i>
         </button>
         <div style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800', color: '#ffffff' }}>Canvas Videos</h2>
+          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)' }}>Canvas Videos</h2>
           <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
             Cloudinary Sync Studio
           </span>
@@ -116,7 +116,7 @@ export default function ManageCanvasVideosView({ songs = [], onBack, onSongUpdat
           style={{
             width: '100%', height: '42px', backgroundColor: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px',
-            padding: '0 14px 0 38px', color: '#ffffff', outline: 'none', boxSizing: 'border-box',
+            padding: '0 14px 0 38px', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box',
             fontSize: '0.85rem'
           }}
         />
@@ -154,7 +154,7 @@ export default function ManageCanvasVideosView({ songs = [], onBack, onSongUpdat
                     </div>
                   )}
                   <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                    <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', fontWeight: '700', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {songTitle}
                     </h4>
                     <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

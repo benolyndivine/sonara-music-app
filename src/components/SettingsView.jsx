@@ -35,7 +35,10 @@ import {
   EQ_BANDS,
   EQ_PRESET_CONFIGS,
   sonaraAudioEngine,
-  NativeAudioEffects
+  NativeAudioEffects,
+  VIBE_PRESETS,
+  applyVibePreset,
+  getActiveVibePreset
 } from '../utils/audioEffects';
 import { DARK_THEMES, LIGHT_THEMES, APP_THEMES } from '../utils/themes';
 import { CURRENT_APP_VERSION, CURRENT_APP_BUILD } from '../utils/updateService';
@@ -122,6 +125,29 @@ export default function SettingsView({
     setAutomixEnabledState(val);
     setAutomixSetting(val);
     setAutomixEnabledProp?.(val);
+  };
+
+  // Vibe Studio State
+  const [activeVibe, setActiveVibe] = useState(getActiveVibePreset);
+  // Smart Data Saver Mode State
+  const [dataSaverMode, setDataSaverMode] = useState(() => localStorage.getItem('sonara_data_saver') === 'true');
+  // Auto-pause on disconnect State
+  const [autoPauseOnDisconnect, setAutoPauseOnDisconnect] = useState(() => localStorage.getItem('sonara_autopause_disconnect') !== 'false');
+  // Gentle sleep fade-out State
+  const [gentleSleepFade, setGentleSleepFade] = useState(() => localStorage.getItem('sonara_sleep_timer_fade') !== 'false');
+
+  const handleSelectVibe = (vibe) => {
+    triggerHaptic(25);
+    setActiveVibe(vibe.id);
+    const applied = applyVibePreset(vibe.id);
+    setEqPreset?.(applied.eq);
+    setPlaybackSpeedSetting(applied.speed);
+    setSpatialAudioSetting(applied.spatial);
+    setSpatialAudio?.(applied.spatial);
+    setDolbyAtmosSetting(applied.dolby);
+    setDolbyAtmosState(applied.dolby);
+    setDolbyAtmosProp?.(applied.dolby);
+    displayToast(`${applied.name} Vibe Active (${applied.speed} tempo)`);
   };
 
   // Dolby Atmos & Equalizer State
@@ -421,7 +447,7 @@ export default function SettingsView({
           boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
         }}>
           <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
-          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-main)' }}>{toastMessage}</span>
         </div>
       )}
 
@@ -435,7 +461,7 @@ export default function SettingsView({
           style={{
             width: '40px', height: '40px', borderRadius: '50%',
             backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
-            color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', fontSize: '0.95rem'
           }}
           aria-label="Back"
@@ -444,7 +470,7 @@ export default function SettingsView({
         </button>
 
         <div style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.3px' }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
             Settings
           </h2>
           <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
@@ -470,12 +496,12 @@ export default function SettingsView({
         </p>
 
         <div style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255, 255, 255, 0.06)',
+          backgroundColor: 'var(--card-bg, rgba(0, 0, 0, 0.04))', border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
           borderRadius: '14px', padding: '14px', marginBottom: '14px',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center'
         }}>
           <div>
-            <p style={{ margin: '0 0 2px 0', fontSize: '0.92rem', color: '#ffffff', fontWeight: '700' }}>
+            <p style={{ margin: '0 0 2px 0', fontSize: '0.92rem', color: 'var(--text-main)', fontWeight: '700' }}>
               Downloaded Songs
             </p>
             <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)' }}>
@@ -501,7 +527,7 @@ export default function SettingsView({
         <div className="settings-toggle-row" style={{ alignItems: 'center' }}>
           <div style={{ flex: 1, paddingRight: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-              <p style={{ margin: 0, color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Smart Storage Optimization</p>
+              <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Smart Storage Optimization</p>
               <span style={{
                 fontSize: '0.64rem',
                 fontWeight: '700',
@@ -556,14 +582,14 @@ export default function SettingsView({
         {/* Clear Search History */}
         <div className="settings-toggle-row">
           <div>
-            <p style={{ margin: '0 0 2px 0', color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Search History & Recent Tags</p>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Search History & Recent Tags</p>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Delete saved search history tags from device.</p>
           </div>
           <button
             onClick={handleClearSearchHistory}
             style={{
               background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: '#ffffff', borderRadius: '8px', padding: '6px 12px', fontSize: '0.76rem',
+              color: 'var(--text-main)', borderRadius: '8px', padding: '6px 12px', fontSize: '0.76rem',
               fontWeight: '700', cursor: 'pointer'
             }}
           >
@@ -605,7 +631,7 @@ export default function SettingsView({
         {/* Offline Mode Only Toggle */}
         <div className="settings-toggle-row">
           <div>
-            <p style={{ margin: '0 0 2px 0', color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Offline Mode Only (Strict Data Saver)</p>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Offline Mode Only (Strict Data Saver)</p>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Only play downloaded songs; stops all cellular data streaming.</p>
           </div>
           <label className="settings-switch-label">
@@ -617,6 +643,36 @@ export default function SettingsView({
                 setOfflineOnlyModeSetting(e.target.checked);
                 setOfflineOnlyMode?.(e.target.checked);
                 displayToast(e.target.checked ? "Offline-only mode enabled" : "Cellular streaming enabled");
+              }}
+            />
+            <span className="settings-switch-slider"></span>
+          </label>
+        </div>
+
+        {/* Smart Data Saver Mode Toggle */}
+        <div className="settings-toggle-row">
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+              <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Smart Data Saver Mode</p>
+              <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(29, 185, 84, 0.15)', color: 'var(--accent)', fontWeight: '700' }}>ECO 96K</span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Streams audio in high-efficiency 96 kbps Eco AAC to save up to 70% data.</p>
+          </div>
+          <label className="settings-switch-label">
+            <input
+              type="checkbox"
+              checked={dataSaverMode}
+              onChange={(e) => {
+                triggerHaptic(25);
+                setDataSaverMode(e.target.checked);
+                localStorage.setItem('sonara_data_saver', String(e.target.checked));
+                if (e.target.checked) {
+                  handleSelectStreamingQuality('Data Saver');
+                  displayToast("Data Saver enabled (Streaming in 96 kbps Eco)");
+                } else {
+                  handleSelectStreamingQuality('Normal');
+                  displayToast("Data Saver off (Streaming in Normal 160 kbps)");
+                }
               }}
             />
             <span className="settings-switch-slider"></span>
@@ -675,10 +731,10 @@ export default function SettingsView({
         {/* --- Interactive SVG Equalizer Graph Card --- */}
         <div className="eq-graph-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: '800', color: '#ffffff', letterSpacing: '0.5px' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '0.5px' }}>
               REAL-TIME ACOUSTIC SPECTRUM
             </span>
-            <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--accent)', background: 'rgba(29, 185, 84, 0.12)', padding: '2px 8px', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 14%, transparent)', padding: '2px 8px', borderRadius: '10px' }}>
               {eqPreset}
             </span>
           </div>
@@ -697,13 +753,13 @@ export default function SettingsView({
             </defs>
 
             {/* Grid Reference Lines (+12dB, 0dB, -12dB) */}
-            <line x1="0" y1="16" x2="320" y2="16" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-            <line x1="0" y1="60" x2="320" y2="60" stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
-            <line x1="0" y1="104" x2="320" y2="104" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+            <line x1="0" y1="16" x2="320" y2="16" stroke="var(--border-subtle, rgba(255,255,255,0.06))" strokeDasharray="3 3" />
+            <line x1="0" y1="60" x2="320" y2="60" stroke="var(--border-subtle, rgba(255,255,255,0.18))" strokeWidth="1" />
+            <line x1="0" y1="104" x2="320" y2="104" stroke="var(--border-subtle, rgba(255,255,255,0.06))" strokeDasharray="3 3" />
 
             {/* Vertical grid guides for the 5 bands */}
             {eqXCoords.map((x, idx) => (
-              <line key={idx} x1={x} y1="8" x2={x} y2="112" stroke="rgba(255,255,255,0.04)" strokeDasharray="2 2" />
+              <line key={idx} x1={x} y1="8" x2={x} y2="112" stroke="var(--border-subtle, rgba(255,255,255,0.04))" strokeDasharray="2 2" />
             ))}
 
             {/* Live Audio Spectrum Bars (Animated via Web Audio AnalyserNode) */}
@@ -756,7 +812,7 @@ export default function SettingsView({
                     x={x}
                     y={y < 35 ? y + 14 : y - 8}
                     textAnchor="middle"
-                    fill="rgba(255, 255, 255, 0.75)"
+                    fill="var(--text-main)"
                     fontSize="8"
                     fontWeight="700"
                   >
@@ -767,9 +823,9 @@ export default function SettingsView({
             })}
 
             {/* Axis labels */}
-            <text x="4" y="14" fill="rgba(255,255,255,0.3)" fontSize="7" fontWeight="600">+12dB</text>
-            <text x="4" y="58" fill="rgba(255,255,255,0.3)" fontSize="7" fontWeight="600">0dB</text>
-            <text x="4" y="102" fill="rgba(255,255,255,0.3)" fontSize="7" fontWeight="600">-12dB</text>
+            <text x="4" y="14" fill="var(--text-muted)" fontSize="7" fontWeight="600">+12dB</text>
+            <text x="4" y="58" fill="var(--text-muted)" fontSize="7" fontWeight="600">0dB</text>
+            <text x="4" y="102" fill="var(--text-muted)" fontSize="7" fontWeight="600">-12dB</text>
           </svg>
 
           {/* 5 Vertical Band Faders */}
@@ -782,7 +838,7 @@ export default function SettingsView({
                   <span style={{
                     fontSize: '0.68rem',
                     fontWeight: '700',
-                    color: gain !== 0 ? 'var(--accent)' : 'rgba(255,255,255,0.5)',
+                    color: gain !== 0 ? 'var(--accent)' : 'var(--text-muted)',
                     marginBottom: '4px'
                   }}>
                     {formattedGain}
@@ -795,12 +851,13 @@ export default function SettingsView({
                     value={gain}
                     onChange={(e) => handleBandSliderChange(idx, e.target.value)}
                     className="eq-fader-input"
+                    style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
                     aria-label={`${band.label} ${band.sub}`}
                   />
-                  <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#ffffff', marginTop: '6px' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: '800', color: 'var(--text-main)', marginTop: '6px' }}>
                     {band.label}
                   </span>
-                  <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                     {band.sub}
                   </span>
                 </div>
@@ -831,8 +888,8 @@ export default function SettingsView({
 
         {/* Dolby Atmos 3D Surround Virtualizer Card */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(20, 20, 20, 0.7) 100%)',
-          border: '1px solid rgba(245, 158, 11, 0.32)',
+          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, color-mix(in srgb, #f59e0b 8%, var(--card-bg, rgba(255, 255, 255, 0.05))) 100%)',
+          border: '1px solid rgba(245, 158, 11, 0.35)',
           borderRadius: '16px',
           padding: '16px',
           marginBottom: '16px',
@@ -850,7 +907,7 @@ export default function SettingsView({
               </span>
               <span style={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: '700' }}>3D Surround</span>
             </div>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.85)', lineHeight: '1.35' }}>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.35' }}>
               Multi-dimensional cinema virtualizer with sub-harmonic bass, dialogue clarity, and overhead air expansion.
             </p>
           </div>
@@ -871,7 +928,7 @@ export default function SettingsView({
         <div className="settings-toggle-row">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <p style={{ margin: 0, color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>3D Spatial Audio Immersion</p>
+              <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>3D Spatial Audio Immersion</p>
               <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(29, 185, 84, 0.15)', color: 'var(--accent)', fontWeight: '700' }}>HAAS 3D</span>
             </div>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Simulates wide concert-hall soundstage for stereo earphones.</p>
@@ -895,7 +952,7 @@ export default function SettingsView({
         <div className="settings-toggle-row">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <p style={{ margin: 0, color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Autoplay Similar Music</p>
+              <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Autoplay Similar Music</p>
               <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(29, 185, 84, 0.15)', color: 'var(--accent)', fontWeight: '700' }}>SMART MATCH</span>
             </div>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Continuously plays stylistically and acoustically matched songs when your queue ends.</p>
@@ -919,7 +976,7 @@ export default function SettingsView({
         <div className="settings-toggle-row">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <p style={{ margin: 0, color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Volume Normalization</p>
+              <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Volume Normalization</p>
               <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(29, 185, 84, 0.15)', color: 'var(--accent)', fontWeight: '700' }}>-14 LUFS</span>
             </div>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Maintains consistent loudness across different tracks using dynamics compression.</p>
@@ -943,7 +1000,7 @@ export default function SettingsView({
         <p style={{ margin: '16px 0 8px 0', fontSize: '0.8rem', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
           Playback Tempo / Speed
         </p>
-        <div className="settings-pill-row">
+        <div className="settings-pill-row" style={{ marginBottom: '14px' }}>
           {PLAYBACK_SPEEDS.map((speed) => {
             const isActive = playbackSpeed === speed;
             return (
@@ -957,6 +1014,45 @@ export default function SettingsView({
               </button>
             );
           })}
+        </div>
+
+        {/* --- Acoustic Vibe Studio Presets --- */}
+        <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+              Acoustic Vibe Studio
+            </p>
+            <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: '600' }}>Instant Mood Profiles</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+            {VIBE_PRESETS.map((vibe) => {
+              const isActive = activeVibe === vibe.id;
+              return (
+                <div
+                  key={vibe.id}
+                  onClick={() => handleSelectVibe(vibe)}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    backgroundColor: isActive ? `color-mix(in srgb, ${vibe.color} 14%, transparent)` : 'var(--card-bg, rgba(255, 255, 255, 0.03))',
+                    border: `1px solid ${isActive ? vibe.color : 'var(--border-subtle, rgba(255, 255, 255, 0.06))'}`,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isActive ? `0 0 14px ${vibe.color}25` : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <i className={`fa-solid ${vibe.icon}`} style={{ color: vibe.color, fontSize: '1.05rem' }}></i>
+                    {isActive && (
+                      <span style={{ fontSize: '0.6rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: vibe.color, color: '#ffffff', fontWeight: '800' }}>ACTIVE</span>
+                    )}
+                  </div>
+                  <div style={{ color: 'var(--text-main)', fontWeight: '700', fontSize: '0.85rem' }}>{vibe.name}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '2px', lineHeight: '1.25' }}>{vibe.desc}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -981,14 +1077,14 @@ export default function SettingsView({
 
         {/* Crossfade Transition Curve Diagram */}
         <div style={{
-          background: 'rgba(0,0,0,0.3)',
-          border: '1px solid rgba(255,255,255,0.06)',
+          background: 'var(--card-bg, rgba(255, 255, 255, 0.04))',
+          border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
           borderRadius: '14px',
           padding: '12px 14px',
           marginBottom: '16px'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#ffffff', letterSpacing: '0.4px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '0.4px' }}>
               ACOUSTIC BLEND CURVE
             </span>
             <span style={{ fontSize: '0.72rem', fontWeight: '800', color: crossfadeDuration !== 'Off' ? 'var(--accent)' : 'var(--text-muted)' }}>
@@ -1017,8 +1113,8 @@ export default function SettingsView({
             />
             {/* Center overlap marker */}
             <circle cx="150" cy="26" r="4" fill="#ffffff" stroke="var(--accent)" strokeWidth="2" />
-            <text x="8" y="22" fill="rgba(255,255,255,0.4)" fontSize="7.5" fontWeight="700">CURRENT SONG</text>
-            <text x="220" y="22" fill="rgba(255,255,255,0.4)" fontSize="7.5" fontWeight="700">NEXT SONG</text>
+            <text x="8" y="22" fill="var(--text-muted)" fontSize="7.5" fontWeight="700">CURRENT SONG</text>
+            <text x="220" y="22" fill="var(--text-muted)" fontSize="7.5" fontWeight="700">NEXT SONG</text>
           </svg>
         </div>
 
@@ -1047,7 +1143,7 @@ export default function SettingsView({
         <div className="settings-toggle-row">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <p style={{ margin: 0, color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Gapless Playback</p>
+              <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Gapless Playback</p>
               <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(29, 185, 84, 0.15)', color: 'var(--accent)', fontWeight: '700' }}>SEAMLESS</span>
             </div>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
@@ -1072,7 +1168,7 @@ export default function SettingsView({
         <div className="settings-toggle-row" style={{ marginBottom: 0 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <p style={{ margin: 0, color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Automix Smart Blending</p>
+              <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Automix Smart Blending</p>
               <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(29, 185, 84, 0.15)', color: 'var(--accent)', fontWeight: '700' }}>STUDIO</span>
             </div>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
@@ -1162,7 +1258,7 @@ export default function SettingsView({
             }}>
               <i className="fa-solid fa-music"></i>
             </div>
-            <span style={{ fontSize: '0.7rem', color: '#fff', fontWeight: '700' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-main)', fontWeight: '700' }}>
               Origin Island • Active
             </span>
             <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
@@ -1177,7 +1273,7 @@ export default function SettingsView({
         <div className="settings-toggle-row">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <p style={{ margin: 0, color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Origin Island Background Sync</p>
+              <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Origin Island Background Sync</p>
               <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(29, 185, 84, 0.15)', color: 'var(--accent)', fontWeight: '700' }}>VIVO / iQOO</span>
             </div>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
@@ -1198,7 +1294,7 @@ export default function SettingsView({
         <div className="settings-toggle-row" style={{ marginBottom: '14px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <p style={{ margin: 0, color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>System Island Broadcast</p>
+              <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>System Island Broadcast</p>
               <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(29, 185, 84, 0.15)', color: 'var(--accent)', fontWeight: '700' }}>ORIGIN / HYPEROS</span>
             </div>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
@@ -1223,7 +1319,7 @@ export default function SettingsView({
             background: 'rgba(255, 255, 255, 0.06)',
             border: '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: '10px',
-            color: '#ffffff',
+            color: 'var(--text-main)',
             fontSize: '0.8rem',
             fontWeight: '700',
             display: 'flex',
@@ -1249,17 +1345,38 @@ export default function SettingsView({
           <h3 className="settings-card-title">Audio Output Device</h3>
         </div>
         <div style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255, 255, 255, 0.06)',
+          backgroundColor: 'var(--card-bg, rgba(0, 0, 0, 0.04))', border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
           borderRadius: '14px', padding: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }}></div>
             <div>
-              <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: '700', color: '#ffffff' }}>Active System Audio Route</p>
+              <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: '700', color: 'var(--text-main)' }}>Active System Audio Route</p>
               <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>44.1 kHz • 24-bit PCM Audio Pipeline</p>
             </div>
           </div>
           <span style={{ fontSize: '0.74rem', color: 'var(--accent)', fontWeight: '700' }}>Connected</span>
+        </div>
+
+        {/* Auto-Pause on Disconnect Toggle */}
+        <div className="settings-toggle-row" style={{ marginTop: '12px' }}>
+          <div>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Auto-Pause on Disconnect</p>
+            <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Automatically pauses playback when headphones or Bluetooth audio disconnects.</p>
+          </div>
+          <label className="settings-switch-label">
+            <input
+              type="checkbox"
+              checked={autoPauseOnDisconnect}
+              onChange={(e) => {
+                triggerHaptic(25);
+                setAutoPauseOnDisconnect(e.target.checked);
+                localStorage.setItem('sonara_autopause_disconnect', String(e.target.checked));
+                displayToast(e.target.checked ? "Auto-pause on disconnect enabled" : "Auto-pause disabled");
+              }}
+            />
+            <span className="settings-switch-slider"></span>
+          </label>
         </div>
       </div>
 
@@ -1316,10 +1433,31 @@ export default function SettingsView({
             );
           })}
         </div>
+
+        {/* Gentle Sleep Fade-Out Toggle */}
+        <div className="settings-toggle-row" style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+          <div>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Gentle Sleep Fade-Out</p>
+            <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Smoothly fades music volume out over the last 15 seconds so you aren't startled awake.</p>
+          </div>
+          <label className="settings-switch-label">
+            <input
+              type="checkbox"
+              checked={gentleSleepFade}
+              onChange={(e) => {
+                triggerHaptic(25);
+                setGentleSleepFade(e.target.checked);
+                localStorage.setItem('sonara_sleep_timer_fade', String(e.target.checked));
+                displayToast(e.target.checked ? "Gentle sleep fade-out enabled" : "Sleep fade-out off");
+              }}
+            />
+            <span className="settings-switch-slider"></span>
+          </label>
+        </div>
       </div>
 
       {/* ===================================================================
-          9. 6-THEME STUDIO: 3 DARK THEMES & 3 LIGHT THEMES
+          9. 12-THEME STUDIO: 6 DARK THEMES & 6 LIGHT THEMES
           =================================================================== */}
       <div className="settings-glass-card" style={{ position: 'relative', zIndex: 1 }}>
         <div className="settings-card-header">
@@ -1329,21 +1467,21 @@ export default function SettingsView({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h3 className="settings-card-title">Theme & Color Studio</h3>
             <span style={{ backgroundColor: 'rgba(29, 185, 84, 0.15)', color: 'var(--accent)', fontSize: '0.66rem', fontWeight: '800', padding: '2px 8px', borderRadius: '10px' }}>
-              6 THEMES
+              12 THEMES
             </span>
           </div>
         </div>
         <p className="settings-card-desc">
-          Choose from 3 crafted Dark themes and 3 clean Light themes to personalize your Sonara vibe.
+          Choose from 6 crafted Dark themes and 6 clean Light themes to personalize your Sonara vibe with dynamic glass & fluid motion.
         </p>
 
-        {/* 🌙 Dark Themes Category (3 Themes) */}
+        {/* 🌙 Dark Themes Category (6 Themes) */}
         <div className="theme-category-header">
           <span className="theme-category-title">
             <i className="fa-solid fa-moon" style={{ color: 'var(--accent)' }}></i>
             Dark Themes
           </span>
-          <span className="theme-category-badge">3 Modes</span>
+          <span className="theme-category-badge">6 Modes</span>
         </div>
         <div className="theme-card-grid">
           {DARK_THEMES.map((theme) => {
@@ -1371,7 +1509,7 @@ export default function SettingsView({
                   }}
                 >
                   <div className="theme-preview-accent-dot" style={{ backgroundColor: theme.accent }}>
-                    {isSelected && <i className="fa-solid fa-check" style={{ color: '#000', fontSize: '0.55rem', fontWeight: '900' }}></i>}
+                    {isSelected && <i className="fa-solid fa-check" style={{ color: '#ffffff', fontSize: '0.55rem', fontWeight: '900' }}></i>}
                   </div>
                 </div>
                 <p className="theme-card-name">{theme.name}</p>
@@ -1381,13 +1519,13 @@ export default function SettingsView({
           })}
         </div>
 
-        {/* ☀️ Light Themes Category (3 Themes) */}
+        {/* ☀️ Light Themes Category (6 Themes) */}
         <div className="theme-category-header">
           <span className="theme-category-title">
             <i className="fa-solid fa-sun" style={{ color: 'var(--accent)' }}></i>
             Light Themes
           </span>
-          <span className="theme-category-badge">3 Modes</span>
+          <span className="theme-category-badge">6 Modes</span>
         </div>
         <div className="theme-card-grid">
           {LIGHT_THEMES.map((theme) => {
@@ -1415,7 +1553,7 @@ export default function SettingsView({
                   }}
                 >
                   <div className="theme-preview-accent-dot" style={{ backgroundColor: theme.accent }}>
-                    {isSelected && <i className="fa-solid fa-check" style={{ color: '#ffffff', fontSize: '0.55rem', fontWeight: '900' }}></i>}
+                    {isSelected && <i className="fa-solid fa-check" style={{ color: 'var(--text-main)', fontSize: '0.55rem', fontWeight: '900' }}></i>}
                   </div>
                 </div>
                 <p className="theme-card-name">{theme.name}</p>
@@ -1428,7 +1566,7 @@ export default function SettingsView({
         {/* High Contrast */}
         <div className="settings-toggle-row">
           <div>
-            <p style={{ margin: '0 0 2px 0', color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>High Contrast Palette</p>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>High Contrast Palette</p>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Maximizes text readability and borders.</p>
           </div>
           <label className="settings-switch-label">
@@ -1448,7 +1586,7 @@ export default function SettingsView({
         {/* Motion Effects */}
         <div className="settings-toggle-row">
           <div>
-            <p style={{ margin: '0 0 2px 0', color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Fluid Motion Effects</p>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Fluid Motion Effects</p>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Smooth spring transitions and modal slides.</p>
           </div>
           <label className="settings-switch-label">
@@ -1468,7 +1606,7 @@ export default function SettingsView({
         {/* Tactile Haptics */}
         <div className="settings-toggle-row">
           <div>
-            <p style={{ margin: '0 0 2px 0', color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Tactile Haptic Feedback</p>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Tactile Haptic Feedback</p>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Subtle tactile vibration feedback on button presses.</p>
           </div>
           <label className="settings-switch-label">
@@ -1529,7 +1667,7 @@ export default function SettingsView({
         {/* Live Lyrics Preview Box */}
         <div style={{
           backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
+          border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
           borderRadius: '12px',
           padding: '14px',
           marginBottom: '14px',
@@ -1551,7 +1689,7 @@ export default function SettingsView({
         {/* Auto Scroll Toggle */}
         <div className="settings-toggle-row">
           <div>
-            <p style={{ margin: '0 0 2px 0', color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Synchronized Auto-Scroll</p>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Synchronized Auto-Scroll</p>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Follow current song lyric position automatically.</p>
           </div>
           <label className="settings-switch-label">
@@ -1567,7 +1705,7 @@ export default function SettingsView({
         {/* Keep Screen On */}
         <div className="settings-toggle-row">
           <div>
-            <p style={{ margin: '0 0 2px 0', color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Keep Screen Awake</p>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Keep Screen Awake</p>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Prevent device sleep while reading lyrics.</p>
           </div>
           <label className="settings-switch-label">
@@ -1594,7 +1732,7 @@ export default function SettingsView({
 
         <div className="settings-toggle-row">
           <div>
-            <p style={{ margin: '0 0 2px 0', color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Content Restrictions</p>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Content Restrictions</p>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Filter unverified tracks or explicit metadata.</p>
           </div>
           <label className="settings-switch-label">
@@ -1613,7 +1751,7 @@ export default function SettingsView({
 
         <div className="settings-toggle-row">
           <div>
-            <p style={{ margin: '0 0 2px 0', color: '#ffffff', fontSize: '0.88rem', fontWeight: '700' }}>Anonymous Diagnostics</p>
+            <p style={{ margin: '0 0 2px 0', color: 'var(--text-main)', fontSize: '0.88rem', fontWeight: '700' }}>Anonymous Diagnostics</p>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>Send anonymous crash logs to improve app stability.</p>
           </div>
           <label className="settings-switch-label">

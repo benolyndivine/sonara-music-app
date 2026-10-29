@@ -109,7 +109,7 @@ export default function NotificationCenter({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: '#05070c',
+        backgroundColor: 'var(--bg-dark, #05070c)',
         zIndex: 650,
         padding: 'calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 48px)',
         display: 'flex',
@@ -134,7 +134,7 @@ export default function NotificationCenter({
             borderRadius: '50%',
             backgroundColor: 'rgba(255, 255, 255, 0.06)',
             border: '1px solid rgba(255, 255, 255, 0.12)',
-            color: '#ffffff',
+            color: 'var(--text-main)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -147,7 +147,7 @@ export default function NotificationCenter({
         </button>
 
         <div style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.3px' }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
             Notifications
           </h2>
           <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
@@ -224,7 +224,7 @@ export default function NotificationCenter({
             </div>
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: '700', color: '#ffffff' }}>
+                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: '700', color: 'var(--text-main)' }}>
                   New Version v{updateInfo.version} Available!
                 </h4>
                 <span style={{ fontSize: '0.65rem', backgroundColor: 'rgba(29, 185, 84, 0.2)', color: 'var(--accent)', fontWeight: '800', padding: '2px 8px', borderRadius: '10px' }}>
@@ -261,7 +261,7 @@ export default function NotificationCenter({
             }}>
               <i className="fa-solid fa-check" style={{ color: 'var(--accent)', fontSize: '1.4rem' }}></i>
             </div>
-            <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: '#ffffff', fontWeight: '700' }}>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: 'var(--text-main)', fontWeight: '700' }}>
               Sonara is Up to Date!
             </h4>
             <p style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: '280px', lineHeight: 1.4 }}>
@@ -317,7 +317,7 @@ export default function NotificationCenter({
 
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: '700', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {songTitle}
                     </h4>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '500', marginLeft: '8px', flexShrink: 0 }}>
@@ -359,7 +359,7 @@ export default function NotificationCenter({
               </div>
             </div>
 
-            <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', color: '#ffffff', fontWeight: '800' }}>
+            <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', color: 'var(--text-main)', fontWeight: '800' }}>
               All Caught Up!
             </h3>
             <p style={{ margin: '0 0 24px 0', fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: '260px', lineHeight: 1.5 }}>
@@ -376,7 +376,7 @@ export default function NotificationCenter({
               style={{
                 padding: '10px 22px', borderRadius: '24px',
                 backgroundColor: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.18)',
-                color: '#ffffff', fontWeight: '700', fontSize: '0.84rem', cursor: 'pointer',
+                color: 'var(--text-main)', fontWeight: '700', fontSize: '0.84rem', cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: '8px'
               }}
             >
@@ -408,7 +408,7 @@ export default function NotificationCenter({
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
               <i className="fa-solid fa-mobile-screen" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginTop: '3px' }}></i>
               <div>
-                <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: '700', color: '#ffffff' }}>Origin Island Background Mode</p>
+                <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)' }}>Origin Island Background Mode</p>
                 <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>Displays live audio controls in your phone's island when the app is minimized.</p>
               </div>
             </div>
@@ -416,7 +416,7 @@ export default function NotificationCenter({
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
               <i className="fa-solid fa-hard-drive" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginTop: '3px' }}></i>
               <div>
-                <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: '700', color: '#ffffff' }}>Zero-Latency Offline Caching</p>
+                <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)' }}>Zero-Latency Offline Caching</p>
                 <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>Save any track for lossless offline listening with custom storage management.</p>
               </div>
             </div>

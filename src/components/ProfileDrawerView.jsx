@@ -215,7 +215,7 @@ export default function ProfileDrawerView({
       className="pdv-hide-scrollbar"
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: '#05070c', zIndex: 600,
+        backgroundColor: 'var(--bg-dark, #05070c)', zIndex: 600,
         padding: 'calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 36px)',
         display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
         overflowY: 'auto',
@@ -235,13 +235,13 @@ export default function ProfileDrawerView({
           boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
         }}>
           <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
-          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-main)' }}>{toastMessage}</span>
         </div>
       )}
 
       {/* Drawer Top Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', position: 'relative', zIndex: 1 }}>
-        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.3px' }}>
+        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
           Account Profile
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -268,7 +268,7 @@ export default function ProfileDrawerView({
             style={{
               width: '38px', height: '38px', borderRadius: '50%',
               backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.08)',
-              color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+              color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
             }}
           >
             <i className="fa-solid fa-xmark"></i>
@@ -286,7 +286,7 @@ export default function ProfileDrawerView({
             referrerPolicy="no-referrer"
           />
           {!isEditing && (
-            <span style={{ position: 'absolute', bottom: '2px', right: '4px', width: '16px', height: '16px', backgroundColor: '#1db954', border: '3px solid #05070c', borderRadius: '50%' }}></span>
+            <span style={{ position: 'absolute', bottom: '2px', right: '4px', width: '16px', height: '16px', backgroundColor: '#1db954', border: '3px solid var(--bg-dark, #05070c)', borderRadius: '50%' }}></span>
           )}
           {!isEditing && (
             <button
@@ -295,8 +295,9 @@ export default function ProfileDrawerView({
               className="pdv-edit-avatar-btn"
               style={{
                 position: 'absolute', top: '-2px', right: '-2px', width: '28px', height: '28px', borderRadius: '50%',
-                backgroundColor: '#1a2232', border: '2px solid #05070c', color: '#ffffff', display: 'flex',
-                alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem'
+                backgroundColor: 'var(--card-bg, #ffffff)', border: '2px solid var(--bg-dark, #05070c)', color: 'var(--text-main)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
               }}
             >
               <i className="fa-solid fa-pen"></i>
@@ -332,7 +333,7 @@ export default function ProfileDrawerView({
               <button
                 onClick={handleCancelEdit}
                 disabled={isSaving}
-                style={{ flex: 1, height: '42px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#ffffff', fontWeight: '700', cursor: 'pointer' }}
+                style={{ flex: 1, height: '42px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'var(--text-main)', fontWeight: '700', cursor: 'pointer' }}
               >
                 Cancel
               </button>
@@ -348,7 +349,7 @@ export default function ProfileDrawerView({
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '4px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.3px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
                 {user.displayName || 'Sonara Streamer'}
               </h3>
               {isHeadAdmin && (
@@ -418,12 +419,12 @@ export default function ProfileDrawerView({
         className="pdv-settings-hero-card"
         style={{
           marginBottom: '20px',
-          background: 'linear-gradient(135deg, rgba(29, 185, 84, 0.1) 0%, rgba(13, 20, 32, 0.5) 100%)',
-          border: '1px solid rgba(29, 185, 84, 0.3)',
+          background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--card-bg, rgba(255, 255, 255, 0.05))) 0%, var(--card-bg, rgba(255, 255, 255, 0.03)) 100%)',
+          border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
           borderRadius: '18px',
           padding: '16px 18px',
           cursor: 'pointer',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
           position: 'relative',
           zIndex: 1,
           display: 'flex',
@@ -434,23 +435,23 @@ export default function ProfileDrawerView({
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{
             width: '42px', height: '42px', borderRadius: '12px',
-            backgroundColor: 'rgba(29, 185, 84, 0.2)', border: '1px solid rgba(29, 185, 84, 0.4)',
+            backgroundColor: 'color-mix(in srgb, var(--accent) 18%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
           }}>
             <i className="fa-solid fa-gear" style={{ color: 'var(--accent)', fontSize: '1.25rem' }}></i>
           </div>
           <div>
-            <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: '#ffffff' }}>
+            <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: 'var(--text-main)' }}>
               Settings & Preferences
             </h4>
-            <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.65)' }}>
+            <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
               Audio Quality, Origin Island, Equalizer, Themes
             </p>
           </div>
         </div>
         <div style={{
           width: '32px', height: '32px', borderRadius: '50%',
-          backgroundColor: 'rgba(255, 255, 255, 0.06)',
+          backgroundColor: 'color-mix(in srgb, var(--text-main) 6%, transparent)',
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
           <i className="fa-solid fa-chevron-right" style={{ color: 'var(--accent)', fontSize: '0.82rem' }}></i>
@@ -464,12 +465,12 @@ export default function ProfileDrawerView({
         style={{
           marginBottom: '20px',
           background: hasNewUpdate 
-            ? 'linear-gradient(135deg, rgba(29, 185, 84, 0.16) 0%, rgba(9, 13, 20, 0.75) 100%)'
-            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(9, 13, 20, 0.5) 100%)',
+            ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--card-bg, rgba(255, 255, 255, 0.05))) 0%, var(--card-bg, rgba(255, 255, 255, 0.03)) 100%)'
+            : 'var(--card-bg, rgba(255, 255, 255, 0.03))',
           borderRadius: '18px',
-          border: hasNewUpdate ? '1px solid rgba(29, 185, 84, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
+          border: hasNewUpdate ? '1px solid color-mix(in srgb, var(--accent) 35%, transparent)' : '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
           padding: '14px 18px', cursor: 'pointer',
-          boxShadow: hasNewUpdate ? '0 8px 24px rgba(29, 185, 84, 0.2)' : '0 6px 20px rgba(0, 0, 0, 0.25)',
+          boxShadow: '0 6px 20px rgba(0, 0, 0, 0.06)',
           position: 'relative', zIndex: 1,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between'
         }}
@@ -477,8 +478,8 @@ export default function ProfileDrawerView({
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{
             width: '42px', height: '42px', borderRadius: '12px',
-            backgroundColor: hasNewUpdate ? 'rgba(29, 185, 84, 0.22)' : 'rgba(255, 255, 255, 0.06)',
-            border: hasNewUpdate ? '1px solid rgba(29, 185, 84, 0.45)' : '1px solid rgba(255, 255, 255, 0.1)',
+            backgroundColor: hasNewUpdate ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'color-mix(in srgb, var(--text-main) 6%, transparent)',
+            border: hasNewUpdate ? '1px solid color-mix(in srgb, var(--accent) 45%, transparent)' : '1px solid var(--border-subtle, rgba(255, 255, 255, 0.1))',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
           }}>
             <i className={`fa-solid ${isCheckingUpdate ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'}`}
@@ -486,30 +487,30 @@ export default function ProfileDrawerView({
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: '800', color: '#ffffff' }}>
+              <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: '800', color: 'var(--text-main)' }}>
                 Check for Updates
               </h4>
               {hasNewUpdate ? (
-                <span style={{ backgroundColor: 'var(--accent)', color: '#000000', fontSize: '0.64rem', fontWeight: '800', padding: '2px 8px', borderRadius: '10px' }}>
+                <span style={{ backgroundColor: 'var(--accent)', color: '#ffffff', fontSize: '0.64rem', fontWeight: '800', padding: '2px 8px', borderRadius: '10px' }}>
                   v{updateInfo?.version || 'NEW'} READY
                 </span>
               ) : (
-                <span style={{ backgroundColor: 'rgba(29, 185, 84, 0.12)', color: 'var(--accent)', fontSize: '0.64rem', fontWeight: '700', padding: '2px 8px', borderRadius: '10px' }}>
+                <span style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)', fontSize: '0.64rem', fontWeight: '700', padding: '2px 8px', borderRadius: '10px' }}>
                   v{currentVersion}
                 </span>
               )}
             </div>
-            <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.65)' }}>
+            <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
               {isCheckingUpdate ? 'Connecting to Firebase database...' : hasNewUpdate ? 'New version available in database • Tap to update' : 'Live cloud database sync • Tap to check'}
             </p>
           </div>
         </div>
         <button
           style={{
-            background: hasNewUpdate ? 'var(--accent)' : 'rgba(255, 255, 255, 0.08)',
-            border: hasNewUpdate ? 'none' : '1px solid rgba(255, 255, 255, 0.12)',
+            background: hasNewUpdate ? 'var(--accent)' : 'color-mix(in srgb, var(--text-main) 6%, transparent)',
+            border: hasNewUpdate ? 'none' : '1px solid var(--border-subtle, rgba(255, 255, 255, 0.12))',
             borderRadius: '12px',
-            color: hasNewUpdate ? '#000000' : '#ffffff',
+            color: hasNewUpdate ? '#ffffff' : 'var(--text-main)',
             cursor: 'pointer', fontSize: '0.78rem', fontWeight: '700',
             padding: '7px 14px', flexShrink: 0
           }}
@@ -522,10 +523,10 @@ export default function ProfileDrawerView({
       {isHeadAdmin && (
         <div style={{
           marginBottom: '20px',
-          background: 'linear-gradient(135deg, rgba(29, 185, 84, 0.08) 0%, rgba(9, 13, 20, 0.6) 100%)',
+          background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, var(--card-bg, rgba(255, 255, 255, 0.05))) 0%, var(--card-bg, rgba(255, 255, 255, 0.03)) 100%)',
           padding: '16px 14px', borderRadius: '18px',
-          border: '1px solid rgba(29, 185, 84, 0.22)',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+          border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
           position: 'relative', zIndex: 1
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', paddingLeft: '4px' }}>
@@ -535,7 +536,7 @@ export default function ProfileDrawerView({
                 Head Admin Studio
               </span>
             </div>
-            <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.4)', fontWeight: '600' }}>Master Controls</span>
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: '600' }}>Master Controls</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -544,7 +545,7 @@ export default function ProfileDrawerView({
                 <div style={iconBoxStyle}>
                   <i className="fa-solid fa-cloud-arrow-up" style={{ color: 'var(--accent)', fontSize: '0.95rem' }}></i>
                 </div>
-                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Upload Song & Cover</span>
+                <span style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.88rem' }}>Upload Song & Cover</span>
               </div>
               <i className="fa-solid fa-chevron-right" style={chevronStyle}></i>
             </button>
@@ -554,7 +555,7 @@ export default function ProfileDrawerView({
                 <div style={iconBoxStyle}>
                   <i className="fa-solid fa-compact-disc" style={{ color: 'var(--accent)', fontSize: '0.95rem' }}></i>
                 </div>
-                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Create & Assign Albums</span>
+                <span style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.88rem' }}>Create & Assign Albums</span>
               </div>
               <i className="fa-solid fa-chevron-right" style={chevronStyle}></i>
             </button>
@@ -564,7 +565,7 @@ export default function ProfileDrawerView({
                 <div style={iconBoxStyle}>
                   <i className="fa-solid fa-user-astronaut" style={{ color: 'var(--accent)', fontSize: '0.95rem' }}></i>
                 </div>
-                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Manage Artists</span>
+                <span style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.88rem' }}>Manage Artists</span>
               </div>
               <i className="fa-solid fa-chevron-right" style={chevronStyle}></i>
             </button>
@@ -574,7 +575,7 @@ export default function ProfileDrawerView({
                 <div style={iconBoxStyle}>
                   <i className="fa-solid fa-file-lines" style={{ color: 'var(--accent)', fontSize: '0.95rem' }}></i>
                 </div>
-                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Manage Lyrics</span>
+                <span style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.88rem' }}>Manage Lyrics</span>
               </div>
               <i className="fa-solid fa-chevron-right" style={chevronStyle}></i>
             </button>
@@ -584,7 +585,7 @@ export default function ProfileDrawerView({
                 <div style={iconBoxStyle}>
                   <i className="fa-solid fa-tags" style={{ color: 'var(--accent)', fontSize: '0.95rem' }}></i>
                 </div>
-                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Manage Genres & Moods</span>
+                <span style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.88rem' }}>Manage Genres & Moods</span>
               </div>
               <i className="fa-solid fa-chevron-right" style={chevronStyle}></i>
             </button>
@@ -594,7 +595,7 @@ export default function ProfileDrawerView({
                 <div style={iconBoxStyle}>
                   <i className="fa-solid fa-video" style={{ color: 'var(--accent)', fontSize: '0.95rem' }}></i>
                 </div>
-                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Manage Canvas Videos</span>
+                <span style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.88rem' }}>Manage Canvas Videos</span>
               </div>
               <i className="fa-solid fa-chevron-right" style={chevronStyle}></i>
             </button>
@@ -604,7 +605,7 @@ export default function ProfileDrawerView({
                 <div style={iconBoxStyle}>
                   <i className="fa-solid fa-trash-can" style={{ color: '#ff4d4d', fontSize: '0.95rem' }}></i>
                 </div>
-                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Delete Songs (Admin)</span>
+                <span style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.88rem' }}>Delete Songs (Admin)</span>
               </div>
               <i className="fa-solid fa-chevron-right" style={chevronStyle}></i>
             </button>
@@ -614,7 +615,7 @@ export default function ProfileDrawerView({
                 <div style={iconBoxStyle}>
                   <i className="fa-solid fa-cloud-arrow-up" style={{ color: 'var(--accent)', fontSize: '0.95rem' }}></i>
                 </div>
-                <span style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.88rem' }}>Publish / Manage App Update</span>
+                <span style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.88rem' }}>Publish / Manage App Update</span>
               </div>
               <span style={{ fontSize: '0.65rem', backgroundColor: 'rgba(29, 185, 84, 0.2)', color: 'var(--accent)', padding: '2px 8px', borderRadius: '8px', fontWeight: '800' }}>
                 DATABASE
@@ -644,7 +645,7 @@ export default function ProfileDrawerView({
             <i className="fa-solid fa-download" style={{ color: 'var(--accent)', fontSize: '1.05rem' }}></i>
           </div>
           <div>
-            <p style={{ margin: '0 0 2px 0', fontSize: '0.88rem', color: '#ffffff', fontWeight: '700' }}>Downloaded Songs</p>
+            <p style={{ margin: '0 0 2px 0', fontSize: '0.88rem', color: 'var(--text-main)', fontWeight: '700' }}>Downloaded Songs</p>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>{downloadedCount} {downloadedCount === 1 ? 'track' : 'tracks'} saved offline</p>
           </div>
         </div>
@@ -693,7 +694,7 @@ export default function ProfileDrawerView({
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: '800', color: '#ffffff' }}>
+              <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: '800', color: 'var(--text-main)' }}>
                 About Sonara
               </h4>
               <span style={{ backgroundColor: 'rgba(29, 185, 84, 0.12)', color: 'var(--accent)', fontSize: '0.64rem', fontWeight: '700', padding: '2px 8px', borderRadius: '10px' }}>
@@ -723,7 +724,7 @@ export default function ProfileDrawerView({
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <i className="fa-solid fa-sliders" style={{ color: 'var(--accent)', fontSize: '0.9rem' }}></i>
-          <span style={{ fontSize: '0.8rem', color: '#ffffff', fontWeight: '600' }}>Streaming Engine</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-main)', fontWeight: '600' }}>Streaming Engine</span>
         </div>
         <span style={{ fontSize: '0.74rem', color: 'var(--accent)', fontWeight: '700', letterSpacing: '0.4px' }}>Hi-Fi Lossless (320k)</span>
       </div>
@@ -796,7 +797,7 @@ export default function ProfileDrawerView({
             backgroundColor: hasNewUpdate ? '#f59e0b' : 'var(--accent)',
             boxShadow: `0 0 10px ${hasNewUpdate ? '#f59e0b' : 'var(--accent)'}`
           }}></span>
-          <span style={{ fontSize: '0.84rem', fontWeight: '700', color: '#ffffff', letterSpacing: '0.4px' }}>
+          <span style={{ fontSize: '0.84rem', fontWeight: '700', color: 'var(--text-main)', letterSpacing: '0.4px' }}>
             Sonara v{currentVersion}
           </span>
           {hasNewUpdate ? (
@@ -843,7 +844,7 @@ export default function ProfileDrawerView({
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
         }}>
           <div style={{
-            width: '100%', maxWidth: '380px', backgroundColor: '#0d131e',
+            width: '100%', maxWidth: '380px', backgroundColor: 'var(--bg-surface, #0d131e)',
             borderRadius: '24px', border: '1px solid rgba(255, 255, 255, 0.12)',
             padding: '24px 20px', boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
             display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative'
@@ -875,7 +876,7 @@ export default function ProfileDrawerView({
                   Cloud Database Check
                 </span>
               </div>
-              <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#ffffff' }}>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-main)' }}>
                 {updateModalData.hasUpdate
                   ? `New Version v${updateModalData.version} Available!`
                   : updateModalData.error
@@ -901,7 +902,7 @@ export default function ProfileDrawerView({
               }}>
                 <div style={{ textAlign: 'center' }}>
                   <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.45)', textTransform: 'uppercase', fontWeight: '700' }}>Current</span>
-                  <p style={{ margin: '3px 0 0 0', fontSize: '0.95rem', fontWeight: '700', color: '#ffffff' }}>v{currentVersion}</p>
+                  <p style={{ margin: '3px 0 0 0', fontSize: '0.95rem', fontWeight: '700', color: 'var(--text-main)' }}>v{currentVersion}</p>
                 </div>
                 <i className="fa-solid fa-arrow-right" style={{ color: 'var(--accent)', fontSize: '0.9rem' }}></i>
                 <div style={{ textAlign: 'center' }}>
@@ -956,7 +957,7 @@ export default function ProfileDrawerView({
                     style={{
                       height: '46px', padding: '0 16px', borderRadius: '14px',
                       backgroundColor: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.1)',
-                      color: '#ffffff', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer'
+                      color: 'var(--text-main)', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer'
                     }}
                   >
                     Later
@@ -968,7 +969,7 @@ export default function ProfileDrawerView({
                   style={{
                     width: '100%', height: '46px', borderRadius: '14px',
                     backgroundColor: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: '#ffffff', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer'
+                    color: 'var(--text-main)', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer'
                   }}
                 >
                   Close
@@ -995,7 +996,7 @@ export default function ProfileDrawerView({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <i className="fa-solid fa-crown" style={{ color: 'var(--accent)' }}></i>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#ffffff', fontWeight: '800' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-main)', fontWeight: '800' }}>
                   Publish Update to Database
                 </h3>
               </div>
@@ -1074,7 +1075,7 @@ export default function ProfileDrawerView({
                 style={{
                   height: '46px', padding: '0 16px', borderRadius: '14px',
                   backgroundColor: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#ffffff', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer'
+                  color: 'var(--text-main)', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer'
                 }}
               >
                 Cancel
@@ -1100,7 +1101,7 @@ export default function ProfileDrawerView({
           <div 
             onClick={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: '#0c1322', border: '1px solid rgba(29, 185, 84, 0.35)',
+              backgroundColor: 'var(--bg-surface, #0c1322)', border: '1px solid rgba(29, 185, 84, 0.35)',
               borderRadius: '24px', width: '100%', maxWidth: '420px',
               maxHeight: '90vh', overflowY: 'auto',
               boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(29, 185, 84, 0.15)',
@@ -1116,7 +1117,7 @@ export default function ProfileDrawerView({
                 position: 'absolute', top: '16px', right: '16px',
                 width: '34px', height: '34px', borderRadius: '50%',
                 backgroundColor: 'rgba(255, 255, 255, 0.08)', border: 'none',
-                color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', fontSize: '0.9rem'
               }}
             >
@@ -1133,7 +1134,7 @@ export default function ProfileDrawerView({
               }}>
                 <img src={logo} alt="Sonara" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
               </div>
-              <h3 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '900', color: '#ffffff', letterSpacing: '-0.4px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '900', color: 'var(--text-main)', letterSpacing: '-0.4px' }}>
                 Sonara Music
               </h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
@@ -1158,28 +1159,28 @@ export default function ProfileDrawerView({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <i className="fa-solid fa-bolt" style={{ color: 'var(--accent)', fontSize: '1rem', width: '20px', textAlign: 'center' }}></i>
                 <div>
-                  <div style={{ fontSize: '0.76rem', fontWeight: '700', color: '#ffffff' }}>Lossless 320k</div>
+                  <div style={{ fontSize: '0.76rem', fontWeight: '700', color: 'var(--text-main)' }}>Lossless 320k</div>
                   <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Hi-Fi dynamic stream</div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <i className="fa-solid fa-cloud-arrow-down" style={{ color: 'var(--accent)', fontSize: '1rem', width: '20px', textAlign: 'center' }}></i>
                 <div>
-                  <div style={{ fontSize: '0.76rem', fontWeight: '700', color: '#ffffff' }}>Offline Vault</div>
+                  <div style={{ fontSize: '0.76rem', fontWeight: '700', color: 'var(--text-main)' }}>Offline Vault</div>
                   <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Zero-data playback</div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <i className="fa-solid fa-sliders" style={{ color: 'var(--accent)', fontSize: '1rem', width: '20px', textAlign: 'center' }}></i>
                 <div>
-                  <div style={{ fontSize: '0.76rem', fontWeight: '700', color: '#ffffff' }}>Studio EQ</div>
+                  <div style={{ fontSize: '0.76rem', fontWeight: '700', color: 'var(--text-main)' }}>Studio EQ</div>
                   <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>10-Band + Off mode</div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <i className="fa-solid fa-palette" style={{ color: 'var(--accent)', fontSize: '1rem', width: '20px', textAlign: 'center' }}></i>
                 <div>
-                  <div style={{ fontSize: '0.76rem', fontWeight: '700', color: '#ffffff' }}>6 Themes</div>
+                  <div style={{ fontSize: '0.76rem', fontWeight: '700', color: 'var(--text-main)' }}>6 Themes</div>
                   <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Cyber & Light styles</div>
                 </div>
               </div>
@@ -1236,22 +1237,22 @@ export default function ProfileDrawerView({
 const inputStyle = {
   width: '100%', height: '42px', backgroundColor: 'rgba(255, 255, 255, 0.05)',
   border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '10px',
-  padding: '0 12px', color: '#ffffff', outline: 'none', boxSizing: 'border-box'
+  padding: '0 12px', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box'
 };
 
 const iconBoxStyle = {
   width: '32px', height: '32px', borderRadius: '8px',
-  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  backgroundColor: 'color-mix(in srgb, var(--accent) 14%, transparent)',
   display: 'flex', alignItems: 'center', justifyContent: 'center'
 };
 
 const chevronStyle = {
-  color: 'var(--text-muted)', fontSize: '0.75rem', opacity: 0.5
+  color: 'var(--text-muted)', fontSize: '0.75rem', opacity: 0.7
 };
 
 const adminRowBtnStyle = {
   width: '100%', height: '46px', padding: '0 12px',
-  backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)',
+  backgroundColor: 'color-mix(in srgb, var(--text-main) 4%, transparent)', border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
   borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   cursor: 'pointer', transition: 'all 0.15s'
 };
@@ -1264,7 +1265,7 @@ const listRowStyle = {
 };
 
 const rowDividerStyle = {
-  height: '1px', backgroundColor: 'rgba(255, 255, 255, 0.04)', marginLeft: '62px'
+  height: '1px', backgroundColor: 'var(--border-subtle, rgba(255, 255, 255, 0.04))', marginLeft: '62px'
 };
 
 const profileDrawerStyles = `

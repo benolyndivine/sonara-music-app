@@ -210,7 +210,7 @@ export default function FullPlayerView({
             fontSize: '1.05rem',
             fontWeight: isActive ? '800' : '600',
             cursor: line.time !== null ? 'pointer' : 'default',
-            color: isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.28)',
+            color: isActive ? 'var(--text-main, #ffffff)' : 'var(--text-muted, rgba(255, 255, 255, 0.28))',
             backgroundColor: 'transparent',
             padding: '0',
             borderRadius: '0',
@@ -291,9 +291,10 @@ export default function FullPlayerView({
 
   return (
     <div 
+      className="full-player-view-container"
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: '#05070c', zIndex: 300, display: 'flex',
+        backgroundColor: 'var(--app-bg, #05070c)', zIndex: 300, display: 'flex',
         flexDirection: 'column', justifyContent: 'space-between',
         boxSizing: 'border-box', overflow: 'hidden'
       }}
@@ -333,7 +334,7 @@ export default function FullPlayerView({
       >
         {/* Top Header Bar with Working Controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', position: 'relative', zIndex: 10 }}>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.2rem', padding: '4px', pointerEvents: 'auto' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-main, #ffffff)', cursor: 'pointer', fontSize: '1.2rem', padding: '4px', pointerEvents: 'auto' }}>
             <i className="fa-solid fa-chevron-down"></i>
           </button>
           <button
@@ -383,7 +384,7 @@ export default function FullPlayerView({
           </button>
           <button 
             onClick={() => setShowMoreMenu(true)} 
-            style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.2rem', padding: '4px', pointerEvents: 'auto' }}
+            style={{ background: 'none', border: 'none', color: 'var(--text-main, #ffffff)', cursor: 'pointer', fontSize: '1.2rem', padding: '4px', pointerEvents: 'auto' }}
           >
             <i className="fa-solid fa-ellipsis-vertical"></i>
           </button>
@@ -510,7 +511,7 @@ export default function FullPlayerView({
                         : (parsedLyrics.lines[0]?.text || 'Tap to view live lyrics')}
                     </p>
                   </div>
-                  <i className="fa-solid fa-expand" style={{ color: '#ffffff', fontSize: '0.85rem', flexShrink: 0, opacity: 0.85 }}></i>
+                  <i className="fa-solid fa-expand" style={{ color: 'var(--text-main, #ffffff)', fontSize: '0.85rem', flexShrink: 0, opacity: 0.85 }}></i>
                 </div>
               )}
             </div>
@@ -693,6 +694,39 @@ export default function FullPlayerView({
                 <i className="fa-solid fa-headphones" style={{ fontSize: '0.6rem' }}></i> 3D SPATIAL
               </span>
             )}
+
+            {(() => {
+              const activeVibe = typeof localStorage !== 'undefined' ? localStorage.getItem('sonara_active_vibe') : null;
+              if (!activeVibe || activeVibe === 'natural') return null;
+              const isNight = activeVibe === 'nightcore';
+              const isSlow = activeVibe === 'slowed';
+              const color = isNight ? '#f43f5e' : isSlow ? '#a78bfa' : '#fbbf24';
+              const bg = isNight ? 'rgba(244, 63, 94, 0.16)' : isSlow ? 'rgba(139, 92, 246, 0.16)' : 'rgba(245, 158, 11, 0.16)';
+              const border = isNight ? 'rgba(244, 63, 94, 0.35)' : isSlow ? 'rgba(139, 92, 246, 0.35)' : 'rgba(245, 158, 11, 0.35)';
+              const label = isNight ? 'NIGHTCORE' : isSlow ? 'SLOWED' : 'LO-FI';
+              const icon = isNight ? 'fa-bolt' : isSlow ? 'fa-water' : 'fa-mug-hot';
+              return (
+                <span
+                  style={{
+                    fontSize: '0.62rem',
+                    fontWeight: '800',
+                    letterSpacing: '0.4px',
+                    padding: '3px 8px',
+                    borderRadius: '8px',
+                    backgroundColor: bg,
+                    color,
+                    border: `1px solid ${border}`,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    flexShrink: 0
+                  }}
+                  title={`Acoustic Vibe: ${label}`}
+                >
+                  <i className={`fa-solid ${icon}`} style={{ fontSize: '0.6rem' }}></i> {label}
+                </span>
+              );
+            })()}
           </div>
 
           <div style={{ marginBottom: '14px' }}>
@@ -704,7 +738,7 @@ export default function FullPlayerView({
               onChange={(e) => onSeekProgress && onSeekProgress(parseFloat(e.target.value))}
               style={{
                 width: '100%', height: '4px', WebkitAppearance: 'none', appearance: 'none',
-                background: `linear-gradient(to right, #ffffff 0%, #ffffff ${progressPercent}%, rgba(255,255,255,0.2) ${progressPercent}%, rgba(255,255,255,0.2) 100%)`,
+                background: `linear-gradient(to right, var(--text-main, #ffffff) 0%, var(--text-main, #ffffff) ${progressPercent}%, var(--border-subtle, rgba(255,255,255,0.2)) ${progressPercent}%, var(--border-subtle, rgba(255,255,255,0.2)) 100%)`,
                 borderRadius: '2px', outline: 'none', cursor: 'pointer', margin: '4px 0 3px 0'
               }}
               className="player-timeline-seeker-slider"
@@ -716,11 +750,11 @@ export default function FullPlayerView({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px', marginBottom: '6px' }}>
-            <button onClick={onToggleShuffle} style={{ background: 'none', border: 'none', color: isShuffle ? 'var(--accent)' : '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>
+            <button onClick={onToggleShuffle} style={{ background: 'none', border: 'none', color: isShuffle ? 'var(--accent)' : 'var(--text-main, #ffffff)', fontSize: '1.2rem', cursor: 'pointer' }}>
               <i className="fa-solid fa-shuffle"></i>
             </button>
 
-            <button onClick={onPrev} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.8rem', cursor: 'pointer' }}>
+            <button onClick={onPrev} style={{ background: 'none', border: 'none', color: 'var(--text-main, #ffffff)', fontSize: '1.8rem', cursor: 'pointer' }}>
               <i className="fa-solid fa-backward-step"></i>
             </button>
 
@@ -735,13 +769,53 @@ export default function FullPlayerView({
               <i className={isPlaying ? "fa-solid fa-pause" : "fa-solid fa-play"} style={!isPlaying ? { marginLeft: '4px' } : {}}></i>
             </button>
 
-            <button onClick={onNext} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.8rem', cursor: 'pointer' }}>
+            <button onClick={onNext} style={{ background: 'none', border: 'none', color: 'var(--text-main, #ffffff)', fontSize: '1.8rem', cursor: 'pointer' }}>
               <i className="fa-solid fa-forward-step"></i>
             </button>
 
-            <button onClick={onToggleRepeat} style={{ background: 'none', border: 'none', color: isRepeat ? 'var(--accent)' : '#ffffff', fontSize: '1.2rem', cursor: 'pointer', position: 'relative' }}>
+            <button 
+              onClick={onToggleRepeat} 
+              style={{ 
+                background: 'none', 
+                border: 'none', 
+                color: (isRepeat === 'all' || isRepeat === 'one' || isRepeat === true) ? 'var(--accent)' : 'rgba(255,255,255,0.7)', 
+                fontSize: '1.2rem', 
+                cursor: 'pointer', 
+                position: 'relative' 
+              }}
+              title={isRepeat === 'one' ? 'Repeat Current Track Only' : (isRepeat === 'all' || isRepeat === true) ? 'Repeat All Queue Tracks' : 'Repeat Off'}
+            >
               <i className="fa-solid fa-repeat"></i>
-              {isRepeat && <span style={{ position: 'absolute', bottom: '-4px', left: '50%', transform: 'translateX(-50%)', width: '4px', height: '4px', backgroundColor: 'var(--accent)', borderRadius: '50%' }}></span>}
+              {isRepeat === 'one' && (
+                <span style={{ 
+                  position: 'absolute', 
+                  top: '-4px', 
+                  right: '-6px', 
+                  backgroundColor: 'var(--accent)', 
+                  color: '#000000', 
+                  borderRadius: '50%', 
+                  width: '13px', 
+                  height: '13px', 
+                  fontSize: '0.62rem', 
+                  fontWeight: '900', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  lineHeight: 1
+                }}>1</span>
+              )}
+              {(isRepeat === 'all' || isRepeat === true) && (
+                <span style={{ 
+                  position: 'absolute', 
+                  bottom: '-4px', 
+                  left: '50%', 
+                  transform: 'translateX(-50%)', 
+                  width: '4px', 
+                  height: '4px', 
+                  backgroundColor: 'var(--accent)', 
+                  borderRadius: '50%' 
+                }}></span>
+              )}
             </button>
           </div>
 
@@ -906,7 +980,7 @@ export default function FullPlayerView({
           <div 
             onClick={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: '#111622', borderTopLeftRadius: '24px', borderTopRightRadius: '24px',
+              backgroundColor: 'var(--bg-surface, #111622)', borderTopLeftRadius: '24px', borderTopRightRadius: '24px',
               padding: '24px 16px', borderTop: '1px solid rgba(255,255,255,0.08)',
               boxShadow: '0 -8px 32px rgba(0,0,0,0.5)', animation: 'slideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
@@ -914,7 +988,7 @@ export default function FullPlayerView({
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}>
               <CachedImage src={resolvedImgSrc} alt={resolvedTitle} style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }} />
               <div style={{ overflow: 'hidden' }}>
-                <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{resolvedTitle}</h4>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: 'var(--text-main, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{resolvedTitle}</h4>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentTrack.artist}</p>
               </div>
             </div>
@@ -934,7 +1008,7 @@ export default function FullPlayerView({
                   handleDownloadClick();
                   setShowMoreMenu(false);
                 }}
-                style={{ color: isDownloaded ? 'var(--accent)' : '#ffffff' }}
+                style={{ color: isDownloaded ? 'var(--accent)' : 'var(--text-main, #ffffff)' }}
               >
                 <i className={isDownloading ? "fa-solid fa-spinner fa-spin sheet-icon" : isDownloaded ? "fa-solid fa-circle-check sheet-icon" : "fa-solid fa-circle-down sheet-icon"}></i>
                 {isDownloading ? "Downloading Track..." : isDownloaded ? "Saved Offline" : "Download Song"}

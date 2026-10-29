@@ -68,16 +68,16 @@ export default function GenreDetailsView({ genreName, songs, currentTrack, isPla
           boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
         }}>
           <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
-          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-main)' }}>{toastMessage}</span>
         </div>
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0 16px 0', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.3rem', padding: 0 }}>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '1.3rem', padding: 0 }}>
             <i className="fa-solid fa-arrow-left"></i>
           </button>
-          <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.4px' }}>{genreName}</h2>
+          <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.4px' }}>{genreName}</h2>
         </div>
         <button
           onClick={() => setShowSearch(!showSearch)}
@@ -95,7 +95,7 @@ export default function GenreDetailsView({ genreName, songs, currentTrack, isPla
         position: 'relative', zIndex: 1, backdropFilter: 'blur(10px)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
       }}>
         <div>
-          <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: '#fff', fontWeight: '700' }}>{genreName} Vibes</h3>
+          <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: 'var(--text-main)', fontWeight: '700' }}>{genreName} Vibes</h3>
           <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>{genreSongs.length} track{genreSongs.length === 1 ? '' : 's'} curated</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -107,7 +107,7 @@ export default function GenreDetailsView({ genreName, songs, currentTrack, isPla
             }}
             disabled={genreSongs.length === 0}
             style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.08)', color: '#fff', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-main)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px',
               padding: '9px 14px', fontSize: '0.85rem', cursor: genreSongs.length ? 'pointer' : 'not-allowed',
               opacity: genreSongs.length ? 1 : 0.4
             }}
@@ -148,7 +148,7 @@ export default function GenreDetailsView({ genreName, songs, currentTrack, isPla
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
             >
               <i className="fa-solid fa-xmark"></i>
             </button>

@@ -302,12 +302,12 @@ export default function SongActionSheet({
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '2px' }}>
               <button
                 onClick={() => setShowPlaylistsView(false)}
-                style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.1rem', padding: '6px' }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '1.1rem', padding: '6px' }}
                 title="Back to options"
               >
                 <i className="fa-solid fa-arrow-left"></i>
               </button>
-              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#ffffff' }}>Add to Playlist</h4>
+              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--text-main)' }}>Add to Playlist</h4>
             </div>
 
             <div className="creator-songs-search">

@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 
-export const CURRENT_APP_VERSION = '1.5.0';
+export const CURRENT_APP_VERSION = '1.5.1';
 export const CURRENT_APP_BUILD = '2026.10';
 
 /**

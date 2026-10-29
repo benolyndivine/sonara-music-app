@@ -38,7 +38,7 @@ export default function AllArtistsView({ artists, onSelectArtist, onBack }) {
                 </div>
               )}
             </div>
-            <h3 style={{ fontSize: '0.8rem', fontWeight: '600', margin: 0, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+            <h3 style={{ fontSize: '0.8rem', fontWeight: '600', margin: 0, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
               {artist.name}
             </h3>
           </div>

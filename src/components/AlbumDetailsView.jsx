@@ -171,13 +171,13 @@ export default function AlbumDetailsView({
           boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
         }}>
           <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
-          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-main)' }}>{toastMessage}</span>
         </div>
       )}
 
       <div style={{ padding: '0 20px', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0 10px 0' }}>
-          <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '1.4rem', padding: 0 }}>
             <i className="fa-solid fa-arrow-left"></i>
           </button>
           <button
@@ -196,7 +196,7 @@ export default function AlbumDetailsView({
 
         {/* 🌟 Album Title, Interactive Artist Badge & Metadata */}
         <div style={{ marginBottom: '22px' }}>
-          <h2 style={{ margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.6px' }}>{album.name}</h2>
+          <h2 style={{ margin: '0 0 10px 0', fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.6px' }}>{album.name}</h2>
           
           <div
             onClick={() => onSelectArtist && onSelectArtist(matchingArtistData || { name: album.artist })}
@@ -210,7 +210,7 @@ export default function AlbumDetailsView({
                 {(album.artist || '?').charAt(0).toUpperCase()}
               </div>
             )}
-            <span style={{ fontSize: '0.88rem', color: '#ffffff', fontWeight: '600' }}>{album.artist}</span>
+            <span style={{ fontSize: '0.88rem', color: 'var(--text-main)', fontWeight: '600' }}>{album.artist}</span>
             <i className="fa-solid fa-chevron-right" style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', marginLeft: '2px' }}></i>
           </div>
 
@@ -221,16 +221,16 @@ export default function AlbumDetailsView({
 
         {/* 🌟 Action Row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', position: 'relative' }}>
-          <div style={{ display: 'flex', gap: '22px', alignItems: 'center', color: '#ffffff', fontSize: '1.35rem' }}>
+          <div style={{ display: 'flex', gap: '22px', alignItems: 'center', color: 'var(--text-main)', fontSize: '1.35rem' }}>
             <button onClick={handleToggleSaveLibrary} style={{ background: 'none', border: 'none', color: isSavedInLibrary ? 'var(--accent)' : '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title={isSavedInLibrary ? "Saved to Library" : "Save to Library"}>
               <i className={isSavedInLibrary ? "fa-solid fa-circle-check" : "fa-regular fa-circle-check"}></i>
             </button>
 
-            <button onClick={handleBatchDownloadAlbum} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Download entire album">
+            <button onClick={handleBatchDownloadAlbum} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Download entire album">
               <i className={batchDownloading ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-download"} style={{ color: batchDownloading ? 'var(--accent)' : '#ffffff' }}></i>
             </button>
 
-            <button onClick={handleShareAlbum} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Share album">
+            <button onClick={handleShareAlbum} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: 0, fontSize: 'inherit' }} title="Share album">
               <i className="fa-solid fa-arrow-up-from-bracket"></i>
             </button>
 
@@ -240,7 +240,7 @@ export default function AlbumDetailsView({
                 setShowPlaylistPicker(false);
                 setShowHeaderMenu(true);
               }} 
-              style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
               title="Album options"
             >
               <i className="fa-solid fa-ellipsis-vertical"></i>
@@ -280,7 +280,7 @@ export default function AlbumDetailsView({
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
                 <i className="fa-solid fa-xmark"></i>
               </button>
@@ -369,13 +369,13 @@ export default function AlbumDetailsView({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 4px 14px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '8px' }}>
                   <button 
                     onClick={() => setShowPlaylistPicker(false)}
-                    style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'var(--text-main)', fontSize: '1rem', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     title="Back to options"
                   >
                     <i className="fa-solid fa-arrow-left"></i>
                   </button>
                   <div>
-                    <h4 style={{ margin: 0, color: '#fff', fontSize: '1rem', fontWeight: '800' }}>Add Album to Playlist</h4>
+                    <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1rem', fontWeight: '800' }}>Add Album to Playlist</h4>
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Choose which playlist to append all {albumTracks.length} tracks</p>
                   </div>
                 </div>

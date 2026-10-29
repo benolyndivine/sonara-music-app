@@ -139,7 +139,7 @@ export default function ManageAlbumsView({ albums = [], songs = [], onBack, onAl
       className="mav-hide-scrollbar"
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: '#05070c', zIndex: 650,
+        backgroundColor: 'var(--bg-dark, #05070c)', zIndex: 650,
         padding: 'calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 48px)',
         display: 'flex', flexDirection: 'column', boxSizing: 'border-box', overflowY: 'auto',
         animation: 'slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)'
@@ -153,7 +153,7 @@ export default function ManageAlbumsView({ albums = [], songs = [], onBack, onAl
           <i className="fa-solid fa-arrow-left"></i>
         </button>
         <div style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.3px' }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
             Albums Manager
           </h2>
           <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
@@ -209,7 +209,7 @@ export default function ManageAlbumsView({ albums = [], songs = [], onBack, onAl
                 {selectedAlbum ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
                     <CachedImage src={selectedAlbum.image || 'https://placehold.co/80'} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover' }} />
-                    <span style={{ color: '#fff', fontWeight: '600', fontSize: '0.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <span style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {selectedAlbum.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>({selectedAlbum.id})</span>
                     </span>
                   </div>
@@ -309,7 +309,7 @@ export default function ManageAlbumsView({ albums = [], songs = [], onBack, onAl
           {selectedAlbumId && (
             <div style={{ marginBottom: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-main)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   <i className="fa-solid fa-list-check" style={{ color: 'var(--accent)', marginRight: '6px' }}></i>
                   Tracks in {selectedAlbum?.name || selectedAlbumId} ({songsInSelectedAlbum.length})
                 </span>
@@ -333,7 +333,7 @@ export default function ManageAlbumsView({ albums = [], songs = [], onBack, onAl
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, overflow: 'hidden' }}>
                         <CachedImage src={song.cover || 'https://placehold.co/100'} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} />
                         <div style={{ overflow: 'hidden' }}>
-                          <p style={{ margin: 0, fontSize: '0.85rem', color: '#fff', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {song.title || song.id}
                           </p>
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{song.artist || 'Unknown Artist'}</span>
@@ -401,7 +401,7 @@ export default function ManageAlbumsView({ albums = [], songs = [], onBack, onAl
                           style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover' }}
                         />
                         <div style={{ overflow: 'hidden' }}>
-                          <p style={{ margin: 0, fontSize: '0.86rem', color: '#fff', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {song.title || song.id}
                           </p>
                           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -518,7 +518,7 @@ export default function ManageAlbumsView({ albums = [], songs = [], onBack, onAl
                   </div>
                 )}
                 <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#fff', fontWeight: '600' }}>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
                     {imageFile ? imageFile.name : 'Select Album Cover'}
                   </p>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>JPG, PNG, WebP (Uploaded to Cloudinary)</span>
@@ -543,7 +543,7 @@ export default function ManageAlbumsView({ albums = [], songs = [], onBack, onAl
 }
 
 // Inline Styles
-const iconBtnStyle = { width: 40, height: 40, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
+const iconBtnStyle = { width: 40, height: 40, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
 const tabButtonStyle = (active) => ({
   flex: 1, padding: '10px', borderRadius: 10, border: 'none',
   backgroundColor: active ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
@@ -553,7 +553,7 @@ const tabButtonStyle = (active) => ({
 const cardStyle = { backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: '20px', boxShadow: '0 16px 40px rgba(0, 0, 0, 0.5)' };
 const labelStyle = { display: 'flex', alignItems: 'center', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 6, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' };
 const iconLabelStyle = { color: 'var(--accent)', marginRight: '6px', fontSize: '0.8rem' };
-const inputStyle = { width: '100%', height: 46, backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0 14px', color: '#fff', outline: 'none', boxSizing: 'border-box', fontSize: '0.86rem' };
+const inputStyle = { width: '100%', height: 46, backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0 14px', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box', fontSize: '0.86rem' };
 const dropzoneStyle = (hasFile) => ({
   display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14,
   border: hasFile ? '1.5px solid var(--accent)' : '1.5px dashed rgba(255,255,255,0.12)',

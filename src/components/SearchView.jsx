@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { downloadTrackToDevice, isTrackCachedOffline } from '../utils/offlineStorage';
+import { triggerHaptic } from '../utils/audioEffects';
 import CachedImage from './CachedImage';
 
 export default function SearchView({ songs, playlists, albums, artists, currentTrack, isPlaying, likedSongIds = [], onToggleLike, onSelectTrack, onSelectAlbum, onSelectArtist, onAddSongToPlaylist, onOpenSongMenu, autoFocus = true }) {
@@ -89,6 +90,14 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
     saveRecentSearch(queryText);
   };
 
+  const handleSurpriseMe = () => {
+    if (!songs || songs.length === 0) return;
+    triggerHaptic(30);
+    const randomSong = songs[Math.floor(Math.random() * songs.length)];
+    displayToast(`🎲 Playing surprise: "${randomSong.title || randomSong.name}"`);
+    onSelectTrack(randomSong, songs);
+  };
+
   const handleDownloadClick = async (e, song) => {
     e.stopPropagation();
     try {
@@ -156,12 +165,34 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
           boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
         }}>
           <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
-          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-main)' }}>{toastMessage}</span>
         </div>
       )}
 
-      <div className="view-header">
+      <div className="view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h2 className="view-title">Search</h2>
+        <button
+          onClick={handleSurpriseMe}
+          style={{
+            background: 'color-mix(in srgb, var(--accent) 12%, var(--card-bg, rgba(255, 255, 255, 0.05)))',
+            border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+            borderRadius: '20px',
+            padding: '6px 14px',
+            color: 'var(--accent)',
+            fontSize: '0.78rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: '0 4px 12px color-mix(in srgb, var(--accent) 20%, transparent)',
+            transition: 'transform 0.15s ease'
+          }}
+          title="Play a random surprise track!"
+        >
+          <i className="fa-solid fa-dice" style={{ fontSize: '0.88rem' }}></i>
+          <span>Surprise Me</span>
+        </button>
       </div>
 
       <div className="search-input-wrapper" style={{ marginBottom: '20px', position: 'relative' }}>
@@ -176,11 +207,11 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
               saveRecentSearch(e.target.value);
             }
           }}
-          className="search-input-field"
+          className="search-input search-input-field"
           style={{
-            width: '100%', height: '48px', backgroundColor: 'rgba(255, 255, 255, 0.06)',
-            border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px',
-            padding: '0 44px 0 48px', color: '#ffffff', outline: 'none', boxSizing: 'border-box',
+            width: '100%', height: '48px', backgroundColor: 'var(--card-bg, rgba(255, 255, 255, 0.06))',
+            border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.1))', borderRadius: '24px',
+            padding: '0 44px 0 48px', color: 'var(--text-main, #ffffff)', outline: 'none', boxSizing: 'border-box',
             fontSize: '0.92rem'
           }}
         />
@@ -198,7 +229,7 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
               position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
               background: 'rgba(255, 255, 255, 0.15)', border: 'none', borderRadius: '50%',
               width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#ffffff', cursor: 'pointer', fontSize: '0.75rem'
+              color: 'var(--text-main)', cursor: 'pointer', fontSize: '0.75rem'
             }}
             title="Clear search"
           >
@@ -233,7 +264,7 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
           {recentSearches.length > 0 && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#fff', fontWeight: '700' }}>Recent Searches</h3>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: '700' }}>Recent Searches</h3>
                 <button onClick={clearRecentSearches} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '700' }}>Clear all</button>
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -243,7 +274,7 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
                     onClick={() => handleSelectQuery(term)}
                     style={{
                       background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                      color: '#fff', padding: '6px 12px', borderRadius: '14px', fontSize: '0.82rem',
+                      color: 'var(--text-main)', padding: '6px 12px', borderRadius: '14px', fontSize: '0.82rem',
                       cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
                       transition: 'background-color 0.15s ease'
                     }}
@@ -265,10 +296,10 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
           )}
 
           <div>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#fff', fontWeight: '700' }}>Trending Searches</h3>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: '700' }}>Trending Searches</h3>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {trendingQueries.map((trend, i) => (
-                <button key={i} onClick={() => handleSelectQuery(trend)} style={{ background: 'rgba(29, 185, 84, 0.1)', border: '1px solid rgba(29, 185, 84, 0.3)', color: 'var(--accent)', padding: '7px 14px', borderRadius: '14px', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer' }}>
+                <button key={i} onClick={() => handleSelectQuery(trend)} style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)', color: 'var(--accent)', padding: '7px 14px', borderRadius: '14px', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer' }}>
                   <i className="fa-solid fa-arrow-trend-up" style={{ marginRight: '6px' }}></i>{trend}
                 </button>
               ))}
@@ -277,7 +308,7 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
 
           {/* 🌟 Modern 2-Column "Browse Categories" Visual Grid */}
           <div>
-            <h3 style={{ margin: '0 0 14px 0', fontSize: '1.05rem', color: '#ffffff', fontWeight: '700' }}>Browse Categories</h3>
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '1.05rem', color: 'var(--text-main)', fontWeight: '700' }}>Browse Categories</h3>
             <div className="browse-categories-grid">
               {[
                 { title: 'Kollywood Hits', bg: 'linear-gradient(135deg, #f43f5e 0%, #be123c 60%, #881337 100%)', icon: 'fa-fire', query: 'Kollywood' },
@@ -304,10 +335,134 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
         </div>
       )}
 
+      {/* 🌟 Top Result Spotlight Card (when on 'all' tab) */}
+      {searchQuery.trim() !== '' && searchTab === 'all' && (filteredSongs.length > 0 || filteredArtists.length > 0) && (() => {
+        const topSong = filteredSongs[0];
+        const topArtist = !topSong && filteredArtists.length > 0 ? filteredArtists[0] : null;
+        if (!topSong && !topArtist) return null;
+
+        if (topSong) {
+          const isCurrent = currentTrack && topSong.id === currentTrack.id;
+          const songImg = topSong.cover || topSong.image || topSong.imageUrl;
+          return (
+            <section style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--text-main)', marginBottom: '12px', fontWeight: '800' }}>
+                Top Result
+              </h3>
+              <div
+                onClick={() => onSelectTrack(topSong, filteredSongs)}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+                  border: isCurrent ? '1px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <CachedImage
+                  src={songImg}
+                  alt={topSong.title || ''}
+                  style={{ width: '74px', height: '74px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0, boxShadow: '0 6px 18px rgba(0,0,0,0.45)' }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 8px', borderRadius: '6px', background: 'rgba(29, 185, 84, 0.2)', color: 'var(--accent)', fontSize: '0.64rem', fontWeight: '800', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    <i className="fa-solid fa-music"></i> Song
+                  </div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: '800', color: isCurrent ? 'var(--accent)' : '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {topSong.title || topSong.name}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {topSong.artist || 'Unknown Artist'} • {topSong.genre || 'Music'}
+                  </p>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectTrack(topSong, filteredSongs);
+                  }}
+                  style={{
+                    width: '46px',
+                    height: '46px',
+                    borderRadius: '50%',
+                    background: 'var(--accent)',
+                    border: 'none',
+                    color: '#000000',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.05rem',
+                    flexShrink: 0,
+                    cursor: 'pointer',
+                    boxShadow: '0 6px 16px rgba(29, 185, 84, 0.45)',
+                  }}
+                >
+                  <i className={isCurrent && isPlaying ? "fa-solid fa-pause" : "fa-solid fa-play"} style={{ marginLeft: isCurrent && isPlaying ? '0' : '2px' }}></i>
+                </button>
+              </div>
+            </section>
+          );
+        } else if (topArtist) {
+          return (
+            <section style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--text-main)', marginBottom: '12px', fontWeight: '800' }}>
+                Top Result
+              </h3>
+              <div
+                onClick={() => onSelectArtist && onSelectArtist(topArtist)}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+                }}
+              >
+                {topArtist.image ? (
+                  <CachedImage
+                    src={topArtist.image}
+                    alt={topArtist.name}
+                    style={{ width: '74px', height: '74px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, boxShadow: '0 6px 18px rgba(0,0,0,0.45)' }}
+                  />
+                ) : (
+                  <div style={{ width: '74px', height: '74px', borderRadius: '50%', background: 'var(--accent)', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: '800' }}>
+                    {(topArtist.name || 'A').charAt(0)}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 8px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', fontSize: '0.64rem', fontWeight: '800', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    <i className="fa-solid fa-user"></i> Artist
+                  </div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: '800', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {topArtist.name}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)' }}>
+                    Artist Profile
+                  </p>
+                </div>
+              </div>
+            </section>
+          );
+        }
+        return null;
+      })()}
+
       {/* 🌟 Artists Results */}
       {searchQuery.trim() !== '' && (searchTab === 'all' || searchTab === 'artists') && filteredArtists.length > 0 && (
         <section style={{ marginBottom: '28px' }}>
-          <h3 style={{ fontSize: '1.1rem', color: '#ffffff', marginBottom: '14px', fontWeight: '700' }}>Artists</h3>
+          <h3 style={{ fontSize: '1.1rem', color: 'var(--text-main)', marginBottom: '14px', fontWeight: '700' }}>Artists</h3>
           <div className="horizontal-scroll" style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '10px' }}>
             {filteredArtists.map((artist) => (
               <div
@@ -332,7 +487,7 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
                     {(artist.name || '?').charAt(0).toUpperCase()}
                   </div>
                 )}
-                <h3 style={{ fontSize: '0.85rem', margin: '8px 0 2px 0', color: '#ffffff', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px' }}>
+                <h3 style={{ fontSize: '0.85rem', margin: '8px 0 2px 0', color: 'var(--text-main)', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px' }}>
                   {artist.name}
                 </h3>
                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>Artist</p>
@@ -345,7 +500,7 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
       {/* 🌟 Albums Results */}
       {searchQuery.trim() !== '' && (searchTab === 'all' || searchTab === 'albums') && filteredAlbums.length > 0 && (
         <section style={{ marginBottom: '28px' }}>
-          <h3 style={{ fontSize: '1.1rem', color: '#ffffff', marginBottom: '14px', fontWeight: '700' }}>Albums</h3>
+          <h3 style={{ fontSize: '1.1rem', color: 'var(--text-main)', marginBottom: '14px', fontWeight: '700' }}>Albums</h3>
           <div className="horizontal-scroll" style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '10px' }}>
             {filteredAlbums.map((album) => (
               <div key={album.id} className="song-card" onClick={() => onSelectAlbum && onSelectAlbum(album)} style={{ cursor: 'pointer', minWidth: '130px', maxWidth: '130px' }}>
@@ -363,7 +518,7 @@ export default function SearchView({ songs, playlists, albums, artists, currentT
       {/* 🌟 Songs Results */}
       {searchQuery.trim() !== '' && (searchTab === 'all' || searchTab === 'songs') && (
         <section>
-          <h3 style={{ fontSize: '1.1rem', color: '#ffffff', marginBottom: '14px', fontWeight: '700' }}>Songs</h3>
+          <h3 style={{ fontSize: '1.1rem', color: 'var(--text-main)', marginBottom: '14px', fontWeight: '700' }}>Songs</h3>
           
           <div className="songs-vertical-grid">
             {filteredSongs.length > 0 ? (

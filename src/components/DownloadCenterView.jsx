@@ -119,7 +119,7 @@ export default function DownloadCenterView({
       className="dc-hide-scrollbar"
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'var(--bg-dark, #05070c)', zIndex: 750,
+        backgroundColor: 'var(--bg-dark, #05070c)', color: 'var(--text-main)', zIndex: 750,
         padding: 'calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 48px)',
         display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
         overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none',
@@ -139,7 +139,7 @@ export default function DownloadCenterView({
           boxShadow: '0 8px 24px rgba(0,0,0,0.6)', animation: 'slideDownToast 0.25s ease'
         }}>
           <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent)', fontSize: '1rem' }}></i>
-          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#ffffff' }}>{toastMessage}</span>
+          <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-main)' }}>{toastMessage}</span>
         </div>
       )}
 
@@ -150,7 +150,7 @@ export default function DownloadCenterView({
           style={{
             width: '42px', height: '42px', borderRadius: '50%',
             backgroundColor: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.12)',
-            color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', fontSize: '1.05rem', transition: 'all 0.15s ease'
           }}
           aria-label="Back"
@@ -159,7 +159,7 @@ export default function DownloadCenterView({
         </button>
 
         <div style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.3px' }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
             Download Center
           </h2>
           <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
@@ -208,7 +208,7 @@ export default function DownloadCenterView({
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.95rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.5px', fontFamily: "'Montserrat', sans-serif" }}>
+              <h3 style={{ margin: 0, fontSize: '1.95rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.5px', fontFamily: "'Montserrat', sans-serif" }}>
                 {formatBytes(totalStorage)}
               </h3>
               <span style={{ fontSize: '0.78rem', color: 'var(--accent)', fontWeight: '700' }}>
@@ -249,11 +249,11 @@ export default function DownloadCenterView({
           borderTop: '1px solid rgba(255, 255, 255, 0.08)'
         }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '0.98rem', fontWeight: '800', color: '#ffffff', fontFamily: "'Montserrat', sans-serif" }}>{downloadedSongs.length}</div>
+            <div style={{ fontSize: '0.98rem', fontWeight: '800', color: 'var(--text-main)', fontFamily: "'Montserrat', sans-serif" }}>{downloadedSongs.length}</div>
             <div style={{ fontSize: '0.66rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>Songs</div>
           </div>
           <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.08)', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ fontSize: '0.98rem', fontWeight: '800', color: '#ffffff', fontFamily: "'Montserrat', sans-serif" }}>~{formattedPlaytime}</div>
+            <div style={{ fontSize: '0.98rem', fontWeight: '800', color: 'var(--text-main)', fontFamily: "'Montserrat', sans-serif" }}>~{formattedPlaytime}</div>
             <div style={{ fontSize: '0.66rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>Playtime</div>
           </div>
           <div style={{ textAlign: 'center' }}>
@@ -266,7 +266,7 @@ export default function DownloadCenterView({
       {/* Live Active Downloads Section */}
       {activeTaskList.length > 0 && (
         <div style={{ marginBottom: '24px', position: 'relative', zIndex: 1 }}>
-          <h3 style={{ margin: '0 0 12px 4px', fontSize: '0.88rem', fontWeight: '800', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h3 style={{ margin: '0 0 12px 4px', fontSize: '0.88rem', fontWeight: '800', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <i className="fa-solid fa-cloud-arrow-down" style={{ color: 'var(--accent)' }}></i>
             <span>Downloading Now ({activeTaskList.length})</span>
           </h3>
@@ -294,7 +294,7 @@ export default function DownloadCenterView({
                       </div>
                     )}
                     <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</h4>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</h4>
                       <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>{task.artist}</p>
                     </div>
                   </div>
@@ -345,7 +345,7 @@ export default function DownloadCenterView({
               width: '48px', height: '46px', borderRadius: '15px',
               backgroundColor: 'rgba(255, 255, 255, 0.08)',
               border: '1px solid rgba(255, 255, 255, 0.14)',
-              color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', fontSize: '1.15rem'
             }}
             title="Shuffle offline songs"
@@ -367,7 +367,7 @@ export default function DownloadCenterView({
               style={{
                 width: '100%', height: '42px', backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '14px',
-                padding: '0 36px 0 38px', color: '#ffffff', outline: 'none', boxSizing: 'border-box',
+                padding: '0 36px 0 38px', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box',
                 fontSize: '0.86rem', fontFamily: "'Montserrat', sans-serif"
               }}
             />
@@ -411,7 +411,7 @@ export default function DownloadCenterView({
 
       {/* Completed Downloads Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', position: 'relative', zIndex: 1 }}>
-        <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: '800', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+        <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: '800', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
           Downloaded Tracks ({filteredDownloads.length})
         </h3>
         <span 
@@ -496,7 +496,7 @@ export default function DownloadCenterView({
         ) : (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
             <i className="fa-solid fa-cloud-arrow-down" style={{ fontSize: '2.6rem', opacity: 0.3, marginBottom: '14px', color: 'var(--accent)' }}></i>
-            <p style={{ margin: 0, fontSize: '0.9rem', color: '#ffffff', fontWeight: '700' }}>
+            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: '700' }}>
               {filterQuery ? `No tracks match "${filterQuery}"` : 'No downloaded tracks found'}
             </p>
             <p style={{ margin: '6px 0 0', fontSize: '0.76rem', opacity: 0.7, maxWidth: '260px', marginLeft: 'auto', marginRight: 'auto' }}>

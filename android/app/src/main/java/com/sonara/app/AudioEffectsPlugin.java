@@ -4,12 +4,17 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.media.AudioDeviceInfo;
+import android.media.AudioDeviceCallback;
+import android.media.AudioManager;
 import android.media.audiofx.AudioEffect;
 import android.media.audiofx.BassBoost;
 import android.media.audiofx.Equalizer;
 import android.media.audiofx.LoudnessEnhancer;
 import android.media.audiofx.Virtualizer;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -48,6 +53,8 @@ public class AudioEffectsPlugin extends Plugin {
     private static volatile boolean normalizeVolumeEnabled = true;
 
     private BroadcastReceiver audioSessionReceiver;
+    private AudioDeviceCallback audioDeviceCallback;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private static class SessionEffects {
         final int sessionId;
@@ -119,11 +126,25 @@ public class AudioEffectsPlugin extends Plugin {
             Log.w(TAG, "Could not register audio session receiver: " + e.getMessage());
         }
 
-        // Try global output mix session 0
+        // Register audio routing changes to dynamically adapt Virtualizer (headphones vs phone speaker)
         try {
-            setupSessionEffects(0);
-        } catch (Throwable t) {
-            Log.d(TAG, "Global mix session 0 not allowed on this device: " + t.getMessage());
+            AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            if (am != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                audioDeviceCallback = new AudioDeviceCallback() {
+                    @Override
+                    public void onAudioDevicesAdded(AudioDeviceInfo[] addedDevices) {
+                        mainHandler.post(() -> updateAllSessions());
+                    }
+
+                    @Override
+                    public void onAudioDevicesRemoved(AudioDeviceInfo[] removedDevices) {
+                        mainHandler.post(() -> updateAllSessions());
+                    }
+                };
+                am.registerAudioDeviceCallback(audioDeviceCallback, mainHandler);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not register audio device callback: " + e.getMessage());
         }
 
         // Apply any pending active sessions
@@ -143,11 +164,56 @@ public class AudioEffectsPlugin extends Plugin {
             audioSessionReceiver = null;
         }
 
+        if (context != null && audioDeviceCallback != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+                if (am != null) {
+                    am.unregisterAudioDeviceCallback(audioDeviceCallback);
+                }
+            } catch (Exception ignored) {}
+            audioDeviceCallback = null;
+        }
+
         for (SessionEffects fx : sessionEffectsMap.values()) {
             fx.release();
         }
         sessionEffectsMap.clear();
         instance = null;
+    }
+
+    /**
+     * Helper to detect if headphones or Bluetooth audio are connected
+     */
+    private boolean isHeadphonesOrBluetoothConnected() {
+        Context context = getContext();
+        if (context == null) return false;
+        try {
+            AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            if (am == null) return false;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                AudioDeviceInfo[] devices = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+                for (AudioDeviceInfo dev : devices) {
+                    int type = dev.getType();
+                    if (type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                        type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                        type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                        type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                        type == AudioDeviceInfo.TYPE_USB_HEADSET ||
+                        type == AudioDeviceInfo.TYPE_LINE_ANALOG ||
+                        type == AudioDeviceInfo.TYPE_LINE_DIGITAL ||
+                        type == AudioDeviceInfo.TYPE_AUX_LINE ||
+                        type == AudioDeviceInfo.TYPE_HEARING_AID) {
+                        return true;
+                    }
+                }
+                return false;
+            } else {
+                return am.isWiredHeadsetOn() || am.isBluetoothA2dpOn();
+            }
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**
@@ -158,6 +224,8 @@ public class AudioEffectsPlugin extends Plugin {
         Log.i(TAG, "Attaching native audio session: " + sessionId);
         activeSessions.add(sessionId);
         if (instance != null) {
+            // Remove global session 0 so effects are never cascaded / doubled!
+            instance.removeSessionEffects(0);
             instance.setupSessionEffects(sessionId);
         }
     }
@@ -176,6 +244,11 @@ public class AudioEffectsPlugin extends Plugin {
 
     private synchronized void setupSessionEffects(int sessionId) {
         try {
+            // Prevent setting up session 0 if active player sessions already exist
+            if (sessionId == 0 && !activeSessions.isEmpty()) {
+                return;
+            }
+
             SessionEffects session = sessionEffectsMap.get(sessionId);
             if (session == null) {
                 session = new SessionEffects(sessionId);
@@ -266,11 +339,12 @@ public class AudioEffectsPlugin extends Plugin {
                 float gainDb = (closestIdx < currentBands.length) ? currentBands[closestIdx] : 0f;
 
                 // When Dolby Atmos is active, add acoustic cinematic presence contouring
+                // with dialogue clarity, sub-bass warmth, and spatial air without clipping
                 if (dolbyAtmosEnabled) {
-                    if (closestIdx == 0) gainDb += 4.5f;       // Sub-bass warmth
-                    else if (closestIdx == 1) gainDb += 2.0f;  // Mid-bass body
-                    else if (closestIdx == 3) gainDb += 2.5f;  // Vocal presence
-                    else if (closestIdx == 4) gainDb += 4.0f;  // Spatial air
+                    if (closestIdx == 0) gainDb += 1.5f;       // Sub-bass warmth (clean, non-clipping)
+                    else if (closestIdx == 1) gainDb += 1.0f;  // Mid-bass body
+                    else if (closestIdx == 3) gainDb += 2.5f;  // Vocal presence & dialogue clarity
+                    else if (closestIdx == 4) gainDb += 3.0f;  // Spatial overhead air
                 }
 
                 short levelMb = (short) Math.round(gainDb * 100f);
@@ -289,16 +363,36 @@ public class AudioEffectsPlugin extends Plugin {
         if (virt == null) return;
 
         try {
-            boolean enable = spatialAudioEnabled || dolbyAtmosEnabled;
+            boolean isHeadphones = isHeadphonesOrBluetoothConnected();
+            boolean enable = spatialAudioEnabled || (dolbyAtmosEnabled && isHeadphones);
+
             if (enable) {
                 virt.setEnabled(true);
-                if (virt.getStrengthSupported()) {
-                    virt.setStrength((short) 1000);
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    try {
-                        virt.forceVirtualizationMode(Virtualizer.VIRTUALIZATION_MODE_BINAURAL);
-                    } catch (Exception ignored) {}
+
+                if (isHeadphones) {
+                    // Connected to earphones/headphones:
+                    // Use a balanced strength (380 out of 1000) that gives a wide 3D concert stage
+                    // without attenuating the center channel or causing comb-filtering volume drop!
+                    if (virt.getStrengthSupported()) {
+                        virt.setStrength((short) 380);
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        try {
+                            virt.forceVirtualizationMode(Virtualizer.VIRTUALIZATION_MODE_BINAURAL);
+                        } catch (Exception ignored) {}
+                    }
+                } else {
+                    // Mobile phone internal speaker:
+                    // NEVER force binaural mode on speakers — inverted phase cancels out center vocals & bass!
+                    // Use transaural mode with subtle widening so volume stays 100% full and punchy.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        try {
+                            virt.forceVirtualizationMode(Virtualizer.VIRTUALIZATION_MODE_TRANSAURAL);
+                        } catch (Exception ignored) {}
+                    }
+                    if (virt.getStrengthSupported()) {
+                        virt.setStrength((short) 150);
+                    }
                 }
             } else {
                 virt.setEnabled(false);
@@ -315,7 +409,9 @@ public class AudioEffectsPlugin extends Plugin {
                 if (dolbyAtmosEnabled) {
                     bb.setEnabled(true);
                     if (bb.getStrengthSupported()) {
-                        bb.setStrength((short) 800);
+                        // Strength 300 provides rich, warm cinema low-end without overdriving
+                        // the audio pipeline or triggering the system limiter ducking
+                        bb.setStrength((short) 300);
                     }
                 } else {
                     bb.setEnabled(false);
@@ -333,10 +429,12 @@ public class AudioEffectsPlugin extends Plugin {
         try {
             if (dolbyAtmosEnabled) {
                 le.setEnabled(true);
-                le.setTargetGain(650); // +6.5 dB dynamic acoustic contouring
+                // +5.0 dB clean loudness boost ensures music is loud, full, and punchy on mobile
+                le.setTargetGain(500);
             } else if (normalizeVolumeEnabled) {
                 le.setEnabled(true);
-                le.setTargetGain(350); // +3.5 dB standard volume normalization
+                // +3.5 dB standard volume normalization
+                le.setTargetGain(350);
             } else {
                 le.setEnabled(false);
             }
@@ -346,6 +444,9 @@ public class AudioEffectsPlugin extends Plugin {
     }
 
     private void updateAllSessions() {
+        if (!activeSessions.isEmpty()) {
+            removeSessionEffects(0);
+        }
         for (SessionEffects s : sessionEffectsMap.values()) {
             applyAllEffectsToSession(s);
         }

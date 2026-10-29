@@ -59,6 +59,28 @@ export const EQ_PRESET_CONFIGS = {
   'Custom': [0, 0, 0, 0, 0],
 };
 
+export const VIBE_PRESETS = [
+  { id: 'natural', name: 'Original', icon: 'fa-music', desc: 'Natural balanced studio fidelity', speed: '1.0x', eq: 'Flat', spatial: false, dolby: false, color: '#1db954' },
+  { id: 'nightcore', name: 'Nightcore', icon: 'fa-bolt', desc: '1.25x tempo • Crisp treble punch', speed: '1.25x', eq: 'Treble Boost', spatial: false, dolby: true, color: '#f43f5e' },
+  { id: 'slowed', name: 'Slowed + Reverb', icon: 'fa-water', desc: '0.85x tempo • Haas 3D soundstage', speed: '0.85x', eq: 'Bass Boost', spatial: true, dolby: true, color: '#8b5cf6' },
+  { id: 'lofi', name: 'Lo-Fi Chill', icon: 'fa-mug-hot', desc: '0.9x tempo • Vintage acoustic warmth', speed: '0.9x', eq: 'Acoustic', spatial: true, dolby: false, color: '#f59e0b' },
+];
+
+export function applyVibePreset(vibeId) {
+  const vibe = VIBE_PRESETS.find(v => v.id === vibeId) || VIBE_PRESETS[0];
+  setPlaybackSpeedSetting(vibe.speed);
+  setEqPresetSetting(vibe.eq);
+  setSpatialAudioSetting(vibe.spatial);
+  setDolbyAtmosSetting(vibe.dolby);
+  localStorage.setItem('sonara_active_vibe', vibe.id);
+  syncAllAudioEffectsToNative();
+  return vibe;
+}
+
+export function getActiveVibePreset() {
+  return localStorage.getItem('sonara_active_vibe') || 'natural';
+}
+
 export function getPlaybackSpeedSetting() {
   return localStorage.getItem(SPEED_KEY) || '1.0x';
 }
@@ -508,6 +530,23 @@ class SonaraAudioEngine {
     }
   }
 
+  updateMakeupGain() {
+    if (!this.makeupGain) return;
+    const ctx = this.ctx;
+    const now = ctx ? ctx.currentTime : 0;
+    let target = 1.0;
+    if (getDolbyAtmosSetting()) {
+      target = 1.45;
+    } else if (getNormalizeVolumeSetting()) {
+      target = 1.35;
+    }
+    if (ctx) {
+      this.makeupGain.gain.setTargetAtTime(target, now, 0.05);
+    } else {
+      this.makeupGain.gain.value = target;
+    }
+  }
+
   setDolbyAtmos(enabled) {
     if (!this.dolbySubFilter || !this.dolbyPresenceFilter || !this.dolbyAirFilter) return;
     const ctx = this.ctx;
@@ -520,17 +559,12 @@ class SonaraAudioEngine {
       this.dolbySubFilter.gain.setTargetAtTime(subGain, now, 0.05);
       this.dolbyPresenceFilter.gain.setTargetAtTime(presenceGain, now, 0.05);
       this.dolbyAirFilter.gain.setTargetAtTime(airGain, now, 0.05);
-      if (this.makeupGain) {
-        this.makeupGain.gain.setTargetAtTime(enabled ? 1.4 : 1.0, now, 0.05);
-      }
     } else {
       this.dolbySubFilter.gain.value = subGain;
       this.dolbyPresenceFilter.gain.value = presenceGain;
       this.dolbyAirFilter.gain.value = airGain;
-      if (this.makeupGain) {
-        this.makeupGain.gain.value = enabled ? 1.4 : 1.0;
-      }
     }
+    this.updateMakeupGain();
   }
 
   setNormalizeVolume(enabled) {
@@ -542,15 +576,14 @@ class SonaraAudioEngine {
         this.compressor.threshold.setTargetAtTime(-22, now, 0.05);
         this.compressor.knee.setTargetAtTime(12, now, 0.05);
         this.compressor.ratio.setTargetAtTime(4.5, now, 0.05);
-        this.makeupGain.gain.setTargetAtTime(1.4, now, 0.05);
       }
     } else {
       if (ctx) {
         this.compressor.threshold.setTargetAtTime(0, now, 0.05);
         this.compressor.ratio.setTargetAtTime(1.0, now, 0.05);
-        this.makeupGain.gain.setTargetAtTime(1.0, now, 0.05);
       }
     }
+    this.updateMakeupGain();
   }
 
   setPlaybackSpeed(speed) {
@@ -601,6 +634,9 @@ export function applyAudioEffectsToNative(mediaObject, { speed = '1.0x' } = {}) 
     const rate = parseFloat(speed) || 1.0;
     if (rate !== 1.0 && typeof mediaObject.setRate === 'function') {
       mediaObject.setRate(rate);
+    }
+    if (typeof mediaObject.setVolume === 'function') {
+      mediaObject.setVolume(1.0);
     }
   } catch (err) {
     console.warn('Could not apply native media playback rate:', err);
